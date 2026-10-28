@@ -1380,53 +1380,61 @@ const DATA = {
     icon: "🏨",
     unlocked: true,
     part1: [
-      { q: "What are you doing right now?", h: "I'm speaking English with my partner." },
-      { q: "What are you wearing today?", h: "Today I'm wearing a [shirt, jeans, and shoes]." },
-      { q: "What clothes do you usually wear at the weekend?", h: "At the weekend, I usually wear a [T-shirt and shorts]." },
-      { q: "Would you like to visit another country?", h: "Yes, I'd love to visit [Japan / France]." },
-      { q: "What is there in your bedroom?", h: "There's a bed, a desk, a chair, and a wardrobe." },
-      { q: "Is there a lift or a café in your university?", h: "Yes, there is a lift and a nice café." },
-      { q: "Where were you yesterday at 7:00 p.m.?", h: "Yesterday at 7:00 p.m., I was [at home / in a restaurant]." },
-      { q: "Where were you last Saturday night?", h: "Last Saturday night, I was [in a café with friends]." }
+      { q: "What are you doing right now?", h: "I'm speaking English. I'm not playing games." },
+      { q: "What are you wearing today?", h: "I'm wearing [a shirt and jeans]. I'm not wearing [a jacket]." },
+      { q: "What clothes do you usually wear at the weekend?", h: "At the weekend, I usually wear [a T-shirt]. I don't wear [a suit]." },
+      { q: "Would you like to visit another country?", h: "Yes, I'd love to visit [Japan]. / No, I wouldn't." },
+      { q: "What is there in your bedroom?", h: "There's a [bed and a desk], but there isn't a [TV]." },
+      { q: "Is there a lift or a swimming pool in your university?", h: "There's a lift, but there isn't a swimming pool." },
+      { q: "Where were you yesterday at 7:00 p.m.? Were you at school?", h: "No, I wasn't at school. I was [at home]." },
+      { q: "Where were you last Saturday night? Were you at home?", h: "No, I wasn't at home. I was [in a café with friends]." }
     ],
     part2: {
-      taskName: "Room Objects (Is there...? Where is it?)",
+      taskName: "Room Objects (+ / − There is & There are)",
       scenarios: [
         {
           id: 1,
           label: "#1 Spec Room",
           A: {
             askFirst: false,
-            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer B)",
+            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer B: + / −)",
             give: [
-              { label: "🛏️ A bed", val: "Next to the window", a: "Yes, there is. It's next to the window." },
-              { label: "🪑 A desk", val: "Under the window", a: "Yes, there is. It's under the window." },
-              { label: "🚪 A wardrobe", val: "Next to the door", a: "Yes, there is. It's next to the door." },
-              { label: "📺 A TV", val: "On the desk", a: "Yes, there is. It's on the desk." }
+              { label: "🛏️ A bed", val: "✓ Next to window", a: "Yes, there is. It's next to the window." },
+              { label: "🪑 A desk", val: "✓ Under window", a: "Yes, there is. It's under the window." },
+              { label: "🚪 A wardrobe", val: "✗ No wardrobe", a: "No, there isn't a wardrobe in the room." },
+              { label: "📺 A TV", val: "✓ On the desk", a: "Yes, there is. It's on the desk." },
+              { label: "🖼️ Pictures", val: "✗ No pictures", a: "No, there aren't any pictures on the wall." },
+              { label: "🪟 Windows", val: "✓ Behind the bed", a: "Yes, there are. They're behind the bed." }
             ],
             askTitle: "PART 2: ASK B ABOUT THEIR ROOM (Hold item)",
             ask: [
-              { label: "🛋️ A sofa", q: "Is there a sofa in the room? Where is it?", ans: "Opposite the TV" },
-              { label: "📚 A bookshelf", q: "Is there a bookshelf? Where is it?", ans: "Next to the sofa" },
-              { label: "💡 A lamp", q: "Is there a lamp in the room? Where is it?", ans: "On the small table" },
-              { label: "🪞 A mirror", q: "Is there a mirror? Where is it?", ans: "On the wall" }
+              { label: "🛋️ A sofa", q: "Is there a sofa in the room? Where is it?", ans: "✓ Opposite the TV" },
+              { label: "📚 A bookshelf", q: "Is there a bookshelf? Where is it?", ans: "✗ No, there isn't" },
+              { label: "💡 A lamp", q: "Is there a lamp in the room? Where is it?", ans: "✓ On the small table" },
+              { label: "🪞 A mirror", q: "Is there a mirror? Where is it?", ans: "✓ On the wall" },
+              { label: "🪑 Any chairs", q: "Are there any chairs? Where are they?", ans: "✓ Next to the table" },
+              { label: "🪴 Any plants", q: "Are there any plants in the room?", ans: "✗ No, there aren't" }
             ]
           },
           B: {
             askFirst: false,
-            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer A)",
+            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer A: + / −)",
             give: [
-              { label: "🛋️ A sofa", val: "Opposite the TV", a: "Yes, there is. It's opposite the TV." },
-              { label: "📚 A bookshelf", val: "Next to the sofa", a: "Yes, there is. It's next to the sofa." },
-              { label: "💡 A lamp", val: "On the small table", a: "Yes, there is. It's on the small table." },
-              { label: "🪞 A mirror", val: "On the wall", a: "Yes, there is. It's on the wall." }
+              { label: "🛋️ A sofa", val: "✓ Opposite the TV", a: "Yes, there is. It's opposite the TV." },
+              { label: "📚 A bookshelf", val: "✗ No bookshelf", a: "No, there isn't a bookshelf in the room." },
+              { label: "💡 A lamp", val: "✓ On small table", a: "Yes, there is. It's on the small table." },
+              { label: "🪞 A mirror", val: "✓ On the wall", a: "Yes, there is. It's on the wall." },
+              { label: "🪑 Chairs", val: "✓ Next to table", a: "Yes, there are. They're next to the table." },
+              { label: "🪴 Plants", val: "✗ No plants", a: "No, there aren't any plants in the room." }
             ],
             askTitle: "PART 2: ASK A ABOUT THEIR ROOM (Hold item)",
             ask: [
-              { label: "🛏️ A bed", q: "Is there a bed in the room? Where is it?", ans: "Next to the window" },
-              { label: "🪑 A desk", q: "Is there a desk? Where is it?", ans: "Under the window" },
-              { label: "🚪 A wardrobe", q: "Is there a wardrobe? Where is it?", ans: "Next to the door" },
-              { label: "📺 A TV", q: "Is there a TV in the room? Where is it?", ans: "On the desk" }
+              { label: "🛏️ A bed", q: "Is there a bed in the room? Where is it?", ans: "✓ Next to window" },
+              { label: "🪑 A desk", q: "Is there a desk? Where is it?", ans: "✓ Under window" },
+              { label: "🚪 A wardrobe", q: "Is there a wardrobe in the room?", ans: "✗ No, there isn't" },
+              { label: "📺 A TV", q: "Is there a TV in the room? Where is it?", ans: "✓ On the desk" },
+              { label: "🖼️ Any pictures", q: "Are there any pictures on the wall?", ans: "✗ No, there aren't" },
+              { label: "🪟 Any windows", q: "Are there any windows? Where are they?", ans: "✓ Behind the bed" }
             ]
           }
         },
@@ -1437,34 +1445,42 @@ const DATA = {
             askFirst: true,
             askTitle: "PART 1: ASK B ABOUT ROOM 1 (Hold for question)",
             ask: [
-              { label: "🧥 A coat", q: "Is there a coat? Where is it?", ans: "On the chair" },
-              { label: "🔑 Keys", q: "Are there any keys? Where are they?", ans: "On the desk" },
-              { label: "🧳 A suitcase", q: "Is there a suitcase? Where is it?", ans: "Under the bed" },
-              { label: "💡 A lamp", q: "Is there a lamp? Where is it?", ans: "On the table" }
+              { label: "🧥 A coat", q: "Is there a coat? Where is it?", ans: "✓ On the chair" },
+              { label: "🔑 Any keys", q: "Are there any keys? Where are they?", ans: "✓ On the desk" },
+              { label: "🧳 A suitcase", q: "Is there a suitcase? Where is it?", ans: "✓ Under the bed" },
+              { label: "💻 A laptop", q: "Is there a laptop in the room?", ans: "✗ No, there isn't" },
+              { label: "🥤 Any Cokes", q: "Are there any Cokes in the room?", ans: "✗ No, there aren't" },
+              { label: "📰 A newspaper", q: "Is there a newspaper? Where is it?", ans: "✓ In the bag" }
             ],
-            giveTitle: "PART 2: YOUR ROOM 2 PICTURE (Answer B)",
+            giveTitle: "PART 2: YOUR ROOM 2 PICTURE (Answer B: + / −)",
             give: [
-              { label: "💻 A laptop", val: "On the bed", a: "Yes, there is. It's on the bed." },
-              { label: "🧺 Towels", val: "On the floor", a: "Yes, there are. They're on the floor." },
-              { label: "📚 Books", val: "Under the chair", a: "Yes, there are. They're under the chair." },
-              { label: "📱 Remote control", val: "On the table", a: "Yes, there is. It's on the table." }
+              { label: "💻 A laptop", val: "✓ On the bed", a: "Yes, there is. It's on the bed." },
+              { label: "🧺 Towels", val: "✓ On the floor", a: "Yes, there are. They're on the floor." },
+              { label: "📚 Books", val: "✗ No books", a: "No, there aren't any books in the room." },
+              { label: "📱 Remote control", val: "✓ On the table", a: "Yes, there is. It's on the table." },
+              { label: "⏰ A clock", val: "✗ No clock", a: "No, there isn't a clock in the room." },
+              { label: "🛏️ Extra pillows", val: "✓ On wardrobe", a: "Yes, there are. They're on the wardrobe." }
             ]
           },
           B: {
             askFirst: false,
-            giveTitle: "PART 1: YOUR ROOM 1 PICTURE (Answer A)",
+            giveTitle: "PART 1: YOUR ROOM 1 PICTURE (Answer A: + / −)",
             give: [
-              { label: "🧥 A coat", val: "On the chair", a: "Yes, there is. It's on the chair." },
-              { label: "🔑 Keys", val: "On the desk", a: "Yes, there are. They're on the desk." },
-              { label: "🧳 A suitcase", val: "Under the bed", a: "Yes, there is. It's under the bed." },
-              { label: "💡 A lamp", val: "On the table", a: "Yes, there is. It's on the table." }
+              { label: "🧥 A coat", val: "✓ On the chair", a: "Yes, there is. It's on the chair." },
+              { label: "🔑 Keys", val: "✓ On the desk", a: "Yes, there are. They're on the desk." },
+              { label: "🧳 A suitcase", val: "✓ Under the bed", a: "Yes, there is. It's under the bed." },
+              { label: "💻 A laptop", val: "✗ No laptop", a: "No, there isn't a laptop in the room." },
+              { label: "🥤 Cokes", val: "✗ No Cokes", a: "No, there aren't any Cokes in the room." },
+              { label: "📰 A newspaper", val: "✓ In the bag", a: "Yes, there is. It's in the bag." }
             ],
             askTitle: "PART 2: ASK A ABOUT ROOM 2 (Hold for question)",
             ask: [
-              { label: "💻 A laptop", q: "Is there a laptop? Where is it?", ans: "On the bed" },
-              { label: "🧺 Towels", q: "Are there any towels? Where are they?", ans: "On the floor" },
-              { label: "📚 Books", q: "Are there any books? Where are they?", ans: "Under the chair" },
-              { label: "📱 Remote control", q: "Is there a remote control? Where is it?", ans: "On the table" }
+              { label: "💻 A laptop", q: "Is there a laptop? Where is it?", ans: "✓ On the bed" },
+              { label: "🧺 Any towels", q: "Are there any towels? Where are they?", ans: "✓ On the floor" },
+              { label: "📚 Any books", q: "Are there any books in the room?", ans: "✗ No, there aren't" },
+              { label: "📱 Remote control", q: "Is there a remote control? Where is it?", ans: "✓ On the table" },
+              { label: "⏰ A clock", q: "Is there a clock in the room?", ans: "✗ No, there isn't" },
+              { label: "🛏️ Extra pillows", q: "Are there any extra pillows? Where?", ans: "✓ On wardrobe" }
             ]
           }
         },
@@ -1473,36 +1489,44 @@ const DATA = {
           label: "#3 Bedroom",
           A: {
             askFirst: false,
-            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer B)",
+            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer B: + / −)",
             give: [
-              { label: "👓 Glasses", val: "On the book", a: "Yes, there are. They're on the book." },
-              { label: "🔌 Phone charger", val: "In the drawer", a: "Yes, there is. It's in the drawer." },
-              { label: "🛂 A passport", val: "On the desk", a: "Yes, there is. It's on the desk." },
-              { label: "☂️ An umbrella", val: "Under the table", a: "Yes, there is. It's under the table." }
+              { label: "👓 Glasses", val: "✓ On the book", a: "Yes, there are. They're on the book." },
+              { label: "🔌 Phone charger", val: "✓ In the drawer", a: "Yes, there is. It's in the drawer." },
+              { label: "🛂 A passport", val: "✗ No passport", a: "No, there isn't a passport in the room." },
+              { label: "☂️ An umbrella", val: "✓ Under the table", a: "Yes, there is. It's under the table." },
+              { label: "🖊️ Pens", val: "✗ No pens", a: "No, there aren't any pens on the desk." },
+              { label: "🎒 A bag", val: "✓ On the floor", a: "Yes, there is. It's on the floor." }
             ],
             askTitle: "PART 2: ASK B ABOUT THEIR ROOM (Hold item)",
             ask: [
-              { label: "👢 Boots", q: "Are there any boots in the room? Where are they?", ans: "Under the chair" },
-              { label: "👜 Bags", q: "Are there any bags? Where are they?", ans: "In the cupboard" },
-              { label: "🛏️ Extra pillows", q: "Are there any extra pillows? Where are they?", ans: "On the wardrobe" },
-              { label: "👛 A wallet", q: "Is there a wallet in the room? Where is it?", ans: "On the bed" }
+              { label: "👢 Any boots", q: "Are there any boots in the room? Where are they?", ans: "✓ Under the chair" },
+              { label: "👜 Any bags", q: "Are there any bags? Where are they?", ans: "✓ In the cupboard" },
+              { label: "🛏️ Extra pillows", q: "Are there any extra pillows in the room?", ans: "✗ No, there aren't" },
+              { label: "👛 A wallet", q: "Is there a wallet in the room? Where is it?", ans: "✓ On the bed" },
+              { label: "📷 A camera", q: "Is there a camera in the room?", ans: "✗ No, there isn't" },
+              { label: "⌚ A watch", q: "Is there a watch? Where is it?", ans: "✓ Next to the lamp" }
             ]
           },
           B: {
             askFirst: false,
-            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer A)",
+            giveTitle: "PART 1: PICTURE OF YOUR ROOM (Answer A: + / −)",
             give: [
-              { label: "👢 Boots", val: "Under the chair", a: "Yes, there are. They're under the chair." },
-              { label: "👜 Bags", val: "In the cupboard", a: "Yes, there are. They're in the cupboard." },
-              { label: "🛏️ Extra pillows", val: "On the wardrobe", a: "Yes, there are. They're on the wardrobe." },
-              { label: "👛 A wallet", val: "On the bed", a: "Yes, there is. It's on the bed." }
+              { label: "👢 Boots", val: "✓ Under the chair", a: "Yes, there are. They're under the chair." },
+              { label: "👜 Bags", val: "✓ In the cupboard", a: "Yes, there are. They're in the cupboard." },
+              { label: "🛏️ Extra pillows", val: "✗ No pillows", a: "No, there aren't any extra pillows." },
+              { label: "👛 A wallet", val: "✓ On the bed", a: "Yes, there is. It's on the bed." },
+              { label: "📷 A camera", val: "✗ No camera", a: "No, there isn't a camera in the room." },
+              { label: "⌚ A watch", val: "✓ Next to lamp", a: "Yes, there is. It's next to the lamp." }
             ],
             askTitle: "PART 2: ASK A ABOUT THEIR ROOM (Hold item)",
             ask: [
-              { label: "👓 Glasses", q: "Are there any glasses in the room? Where are they?", ans: "On the book" },
-              { label: "🔌 Phone charger", q: "Is there a phone charger? Where is it?", ans: "In the drawer" },
-              { label: "🛂 A passport", q: "Is there a passport? Where is it?", ans: "On the desk" },
-              { label: "☂️ An umbrella", q: "Is there an umbrella? Where is it?", ans: "Under the table" }
+              { label: "👓 Any glasses", q: "Are there any glasses in the room? Where are they?", ans: "✓ On the book" },
+              { label: "🔌 Phone charger", q: "Is there a phone charger? Where is it?", ans: "✓ In the drawer" },
+              { label: "🛂 A passport", q: "Is there a passport in the room?", ans: "✗ No, there isn't" },
+              { label: "☂️ An umbrella", q: "Is there an umbrella? Where is it?", ans: "✓ Under the table" },
+              { label: "🖊️ Any pens", q: "Are there any pens on the desk?", ans: "✗ No, there aren't" },
+              { label: "🎒 A bag", q: "Is there a bag in the room? Where is it?", ans: "✓ On the floor" }
             ]
           }
         }
