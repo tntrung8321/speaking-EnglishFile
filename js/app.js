@@ -267,8 +267,9 @@ function computeAudioId(cleanedText) {
   if (typeof TextEncoder !== "undefined") {
     bytes = new TextEncoder().encode(norm);
   } else {
+    const utf8 = unescape(encodeURIComponent(norm));
     const arr = [];
-    for (let i = 0; i < norm.length; i++) arr.push(norm.charCodeAt(i) & 0xff);
+    for (let i = 0; i < utf8.length; i++) arr.push(utf8.charCodeAt(i));
     bytes = arr;
   }
   let hash = 0x811c9dc5;

@@ -40,6 +40,7 @@ export function loadAppContext(manifest = {}) {
     scrollTo: () => {},
     innerWidth: 390,
     innerHeight: 844,
+    TextEncoder,
     console,
     setFailStatic(v) { failFirstSrc = v; },
     getPlayLog: () => playLog
@@ -82,4 +83,41 @@ test("computeAudioId is deterministic 8-hex FNV-1a and speakSentence prefers man
   await new Promise(r => setImmediate(r));
   assert.equal(ctx.getPlayLog()[0], `audio/${id}.mp3`);
   assert.ok(ctx.getPlayLog()[1].includes("translate_tts"));
+});
+
+test("extractSpeakableCorpus deduplicates ~736 sentences with matching IDs and buildExpressiveTurn injects context emotion without mutating data", async () => {
+  const mod = await import("../lib/corpus-prosody.mjs");
+  const ctx = loadAppContext({});
+  const items = mod.extractSpeakableCorpus(ctx.window.LEVEL_DATA);
+  assert.ok(items.length >= 700 && items.length <= 800, `Unexpected corpus size: ${items.length}`);
+
+  // Hash parity between Node generator and browser app.js (test across entire corpus!)
+  for (const sample of items) {
+    assert.equal(sample.id, ctx.computeAudioId(sample.cleaned));
+    assert.doesNotMatch(sample.cleaned, /<(sigh|short pause|breath)>/);
+  }
+
+  // Feelings distress line gets <sigh> + troubled/weary British style
+  const complaint = mod.buildExpressiveTurn({
+    cleaned: "I'm feeling really tired and stressed.",
+    category: "p2_feelings_problem"
+  });
+  assert.ok(complaint.text.startsWith("<sigh> "), complaint.text);
+  assert.match(complaint.style, /British/i);
+  assert.match(complaint.style, /weary|troubled|tired|emotional/i);
+
+  // Gratitude reaction in Feelings does NOT sigh; uses warm relieved tone
+  const thanks = mod.buildExpressiveTurn({
+    cleaned: "Thank you so much! I'll go to bed early tonight.",
+    category: "p2_feelings_problem"
+  });
+  assert.doesNotMatch(thanks.text, /<sigh>/);
+  assert.match(thanks.style, /relieved|grateful|warm/i);
+
+  // Spot the Differences injects contrastive <short pause> before whereas/but/while
+  const diff = mod.buildExpressiveTurn({
+    cleaned: "In Picture A, the desk lamp is blue, whereas in Picture B, it is yellow.",
+    category: "p2_spot_diff"
+  });
+  assert.ok(diff.text.includes("<short pause> whereas in Picture B"), diff.text);
 });
