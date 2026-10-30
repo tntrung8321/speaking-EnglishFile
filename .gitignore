@@ -1,0 +1,33 @@
+# Confidential textbooks, exam specs & documents (NEVER upload to GitHub)
+*.pdf
+*.PDF
+*.docx
+*.DOCX
+*.doc
+*.DOC
+*.xlsx
+*.xls
+*.pptx
+*.ppt
+*.zip
+*.rar
+*.7z
+
+# Local root reference & level material folders (anchored to repo root)
+/A1/
+/A1.*/
+/A2/
+/A2.*/
+/B1/
+/B1.*/
+/B2/
+/B2.*/
+
+# Local AI agent configs & OS metadata
+/.agents/
+/.claude/
+/.gemini/
+/.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
