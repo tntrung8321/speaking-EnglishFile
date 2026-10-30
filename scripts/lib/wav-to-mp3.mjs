@@ -52,6 +52,9 @@ export function parseWavPcm16(wavBuffer) {
   }
 
   const totalSamples = Math.floor(dataSlice.length / 2);
+  if (totalSamples === 0 || (fmt.channels === 2 && totalSamples < 2)) {
+    throw new Error("Invalid WAV buffer: empty PCM data chunk");
+  }
   const raw = new Int16Array(totalSamples);
   for (let i = 0; i < totalSamples; i++) {
     raw[i] = dataSlice.readInt16LE(i * 2);

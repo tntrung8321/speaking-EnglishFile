@@ -109,6 +109,7 @@ function renderSpeakableText(text, forceMeta = false) {
 let cachedEnVoice = null;
 let sharedAudio = null;
 let activeSpkBtn = null;
+let audioReqSeq = 0;
 
 function clearActiveSpkBtn() {
   if (activeSpkBtn) {
@@ -126,6 +127,7 @@ function setActiveSpkBtn(btn) {
 }
 
 function stopAllAudio() {
+  ++audioReqSeq;
   clearActiveSpkBtn();
   if (sharedAudio) {
     sharedAudio.onended = null;
@@ -289,8 +291,11 @@ function speakSentence(event, rawText) {
   if (!cleaned) return;
 
   stopAllAudio();
+  const reqSeq = audioReqSeq;
+  let fallbackStarted = false;
 
   const playFallback = () => {
+    if (reqSeq !== audioReqSeq) return;
     if (navigator.onLine !== false) {
       try {
         if (!sharedAudio) {
@@ -299,27 +304,31 @@ function speakSentence(event, rawText) {
         }
         const chunks = splitSentenceChunks(cleaned, 175);
         let idx = 0;
+        let speechFallbackStarted = false;
+        const triggerSpeechFallback = () => {
+          if (speechFallbackStarted || reqSeq !== audioReqSeq) return;
+          speechFallbackStarted = true;
+          sharedAudio.onended = null;
+          sharedAudio.onerror = null;
+          speakViaWebSpeech(cleaned, btn);
+        };
 
         const playNextChunk = () => {
+          if (reqSeq !== audioReqSeq) return;
           if (idx >= chunks.length) {
             clearActiveSpkBtn();
             return;
           }
           const chunk = chunks[idx++];
-          sharedAudio.onended = () => playNextChunk();
-          sharedAudio.onerror = () => {
-            sharedAudio.onended = null;
-            sharedAudio.onerror = null;
-            speakViaWebSpeech(cleaned, btn);
+          sharedAudio.onended = () => {
+            if (reqSeq !== audioReqSeq) return;
+            playNextChunk();
           };
+          sharedAudio.onerror = () => triggerSpeechFallback();
           sharedAudio.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en-GB&q=${encodeURIComponent(chunk)}`;
           const p = sharedAudio.play();
           if (p && typeof p.catch === "function") {
-            p.catch(() => {
-              sharedAudio.onended = null;
-              sharedAudio.onerror = null;
-              speakViaWebSpeech(cleaned, btn);
-            });
+            p.catch(() => triggerSpeechFallback());
           }
         };
 
@@ -330,7 +339,19 @@ function speakSentence(event, rawText) {
         // Fall through to Web Speech API
       }
     }
-    speakViaWebSpeech(cleaned, btn);
+    if (reqSeq === audioReqSeq) {
+      speakViaWebSpeech(cleaned, btn);
+    }
+  };
+
+  const triggerFallback = () => {
+    if (fallbackStarted || reqSeq !== audioReqSeq) return;
+    fallbackStarted = true;
+    if (sharedAudio) {
+      sharedAudio.onended = null;
+      sharedAudio.onerror = null;
+    }
+    playFallback();
   };
 
   // Prefer pre-generated expressive Gemini 3.8 TTS MP3 when listed in AUDIO_MANIFEST
@@ -343,23 +364,16 @@ function speakSentence(event, rawText) {
         sharedAudio.referrerPolicy = "no-referrer";
       }
       sharedAudio.onended = () => {
+        if (reqSeq !== audioReqSeq) return;
         sharedAudio.onended = null;
         clearActiveSpkBtn();
       };
-      sharedAudio.onerror = () => {
-        sharedAudio.onended = null;
-        sharedAudio.onerror = null;
-        playFallback();
-      };
+      sharedAudio.onerror = () => triggerFallback();
       setActiveSpkBtn(btn);
       sharedAudio.src = `audio/${audioId}.mp3`;
       const p = sharedAudio.play();
       if (p && typeof p.catch === "function") {
-        p.catch(() => {
-          sharedAudio.onended = null;
-          sharedAudio.onerror = null;
-          playFallback();
-        });
+        p.catch(() => triggerFallback());
       }
       return;
     } catch (e) {
@@ -367,7 +381,7 @@ function speakSentence(event, rawText) {
     }
   }
 
-  playFallback();
+  triggerFallback();
 }
 
 function speakWord(event, word) {
@@ -377,6 +391,14 @@ function speakWord(event, word) {
   if (!word) return;
 
   stopAllAudio();
+  const reqSeq = audioReqSeq;
+  let wordFallbackStarted = false;
+  const triggerWordFallback = () => {
+    if (wordFallbackStarted || reqSeq !== audioReqSeq) return;
+    wordFallbackStarted = true;
+    if (sharedAudio) sharedAudio.onerror = null;
+    speakViaWebSpeech(word);
+  };
 
   // Primary on mobile & web: Real British English dictionary audio (never reads in Vietnamese!)
   const isPureEnglishWord = /^[a-zA-Z][a-zA-Z']*$/.test(word);
@@ -387,17 +409,11 @@ function speakWord(event, word) {
         sharedAudio.referrerPolicy = "no-referrer";
       }
       sharedAudio.onended = null;
-      sharedAudio.onerror = () => {
-        sharedAudio.onerror = null;
-        speakViaWebSpeech(word);
-      };
+      sharedAudio.onerror = () => triggerWordFallback();
       sharedAudio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`;
       const playPromise = sharedAudio.play();
       if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => {
-          sharedAudio.onerror = null;
-          speakViaWebSpeech(word);
-        });
+        playPromise.catch(() => triggerWordFallback());
       }
       return;
     } catch (e) {

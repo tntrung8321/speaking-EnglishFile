@@ -50,6 +50,14 @@ const CATEGORY_PRIORITY = {
   answer: 1
 };
 
+export function isGratitudeReaction(text) {
+  const s = String(text || "").trim();
+  return (
+    /\bthanks?\b/i.test(s) ||
+    /^(that's a (good|great)|that sounds (good|great)|you're (so kind|right)|haha|good idea|okay,?\s*i'll|alright)/i.test(s)
+  );
+}
+
 export function extractSpeakableCorpus(levelData) {
   const byId = new Map();
 
@@ -58,8 +66,26 @@ export function extractSpeakableCorpus(levelData) {
     if (!cleaned) return;
     const id = computeAudioId(cleaned);
     const prev = byId.get(id);
-    if (!prev || (CATEGORY_PRIORITY[category] || 0) > (CATEGORY_PRIORITY[prev.category] || 0)) {
-      byId.set(id, { id, cleaned, category, level, unitKey });
+    if (!prev) {
+      byId.set(id, {
+        id,
+        raw: String(rawText),
+        cleaned,
+        category,
+        level,
+        unitKey,
+        levels: [level],
+        unitKeys: [unitKey]
+      });
+      return;
+    }
+    if (!prev.levels.includes(level)) prev.levels.push(level);
+    if (!prev.unitKeys.includes(unitKey)) prev.unitKeys.push(unitKey);
+    if ((CATEGORY_PRIORITY[category] || 0) > (CATEGORY_PRIORITY[prev.category] || 0)) {
+      prev.category = category;
+      prev.level = level;
+      prev.unitKey = unitKey;
+      prev.raw = String(rawText);
     }
   }
 
@@ -96,11 +122,10 @@ export function extractSpeakableCorpus(levelData) {
           }
         }
         if (sc.interactiveMap) {
-          for (const role of ["A", "B"]) {
-            const mapRole = sc.interactiveMap[role];
-            if (mapRole && mapRole.directions) {
-              for (const dir of Object.values(mapRole.directions)) {
-                register(dir, "p2_directions", level, unitKey);
+          for (const lot of sc.interactiveMap.lots || []) {
+            for (const cell of lot || []) {
+              if ((cell.knownBy === "A" || cell.knownBy === "B") && cell.dir) {
+                register(cell.dir, "p2_directions", level, unitKey);
               }
             }
           }
@@ -139,8 +164,7 @@ export function buildExpressiveTurn({ cleaned, category }) {
   const base = String(cleaned || "").trim();
 
   if (category === "p2_feelings_problem") {
-    const isGratitude = /^(thank|thanks|that's a (good|great)|you're so kind|good idea|okay,?\s*i'll|alright)/i.test(base);
-    if (isGratitude) {
+    if (isGratitudeReaction(base)) {
       return {
         text: addSentencePauses(base),
         style: "Natural British English conversational speaker, warm, relieved and genuinely grateful tone"

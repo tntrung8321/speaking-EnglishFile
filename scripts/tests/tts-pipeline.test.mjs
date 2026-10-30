@@ -245,3 +245,161 @@ test("runGenerator sends Gemini 3.8 TTS schema, retries HTTP 429, skips existing
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+
+test("review regressions: interactiveMap.lots directions, raw cleanSentenceForSpeech parity, multi-unit membership, and all 12 A2 Feelings reactions", async () => {
+  const mod = await import("../lib/corpus-prosody.mjs");
+  const ctx = loadAppContext({});
+  const items = mod.extractSpeakableCorpus(ctx.window.LEVEL_DATA);
+
+  // Critical #1: All 6 categories (including p2_directions from interactiveMap.lots) must be populated (~752 total)
+  const counts = {};
+  for (const it of items) {
+    counts[it.category] = (counts[it.category] || 0) + 1;
+    // Minor #9: Raw cleanSentenceForSpeech parity between browser js/app.js and Node corpus-prosody.mjs
+    assert.ok(typeof it.raw === "string" && it.raw.length > 0);
+    assert.equal(ctx.cleanSentenceForSpeech(it.raw), mod.cleanSentenceForSpeech(it.raw));
+    assert.equal(ctx.cleanSentenceForSpeech(it.raw), it.cleaned);
+  }
+  for (const cat of ["p2_feelings_problem", "p2_feelings_sympathy", "p2_spot_diff", "p2_directions", "question", "answer"]) {
+    assert.ok((counts[cat] || 0) > 0, `Expected category ${cat} to have items, got ${counts[cat] || 0}`);
+  }
+  assert.ok(counts.p2_directions >= 15, `Expected >=15 map direction sentences, got ${counts.p2_directions}`);
+
+  // Minor #7: Cross-unit / A2 final filtering retains all unitKeys and levels
+  const a2FinalMatches = items.filter(it => Array.isArray(it.levels) && it.levels.includes("A2") && Array.isArray(it.unitKeys) && it.unitKeys.includes("final"));
+  assert.ok(a2FinalMatches.length >= 100, `Expected A2 final filter to match >=100 items, got ${a2FinalMatches.length}`);
+
+  // Important #4: Upbeat A2 Feelings reactions ("That sounds great! Thanks...", "Haha, you're right! Thanks...") never sigh
+  for (const line of [
+    "That sounds great! Thanks for your advice, I'll watch a comedy film now.",
+    "Haha, you're right! Thanks for your advice, I won't watch horror films at night anymore."
+  ]) {
+    const turn = mod.buildExpressiveTurn({ cleaned: line, category: "p2_feelings_problem" });
+    assert.doesNotMatch(turn.text, /<sigh>/, `Reaction should not sigh: ${turn.text}`);
+    assert.match(turn.style, /relieved|grateful|warm/i);
+  }
+});
+
+test("review regressions: speakSentence guards against stale AbortError after stopAllAudio and double fallback on 404", async () => {
+  // Custom Audio harness supporting deferred play() promises and simultaneous onerror + rejection
+  const playLog = [];
+  let mode = "ok";
+  let pendingReject = null;
+  let lastAudioInstance = null;
+
+  const ctx = loadAppContext({});
+  ctx.Audio = function () {
+    lastAudioInstance = this;
+    this.play = () => {
+      playLog.push(this.src);
+      if (mode === "double-fail" && this.src.startsWith("audio/")) {
+        mode = "ok";
+        if (typeof this.onerror === "function") this.onerror(new Error("404 error event"));
+        return Promise.reject(new Error("404 play rejection"));
+      }
+      if (mode === "defer-static" && this.src.startsWith("audio/")) {
+        mode = "ok";
+        return new Promise((_, reject) => { pendingReject = reject; });
+      }
+      return Promise.resolve();
+    };
+    this.pause = () => {};
+  };
+  ctx.window.Audio = ctx.Audio;
+
+  const s1 = "What's the matter? How are you feeling today?";
+  const id1 = ctx.computeAudioId(ctx.cleanSentenceForSpeech(s1));
+  ctx.window.AUDIO_MANIFEST[id1] = 1;
+
+  // 1. Simultaneous onerror + play() rejection triggers translate_tts fallback ONCE, not twice
+  mode = "double-fail";
+  ctx.speakSentence(null, s1);
+  await new Promise(r => setImmediate(r));
+  assert.equal(playLog.length, 2, `Expected [static, fallback] once, got: ${JSON.stringify(playLog)}`);
+  assert.equal(playLog[0], `audio/${id1}.mp3`);
+  assert.ok(playLog[1].includes("translate_tts"));
+
+  // 2. Stale AbortError after stopAllAudio() must NOT trigger ghost fallback playback
+  playLog.length = 0;
+  mode = "defer-static";
+  ctx.speakSentence(null, s1);
+  assert.equal(playLog.length, 1);
+  ctx.stopAllAudio();
+  pendingReject(new Error("AbortError: The play() request was interrupted by pause()"));
+  await new Promise(r => setImmediate(r));
+  assert.equal(playLog.length, 1, `Expected zero ghost fallback plays after stopAllAudio, got: ${JSON.stringify(playLog)}`);
+  assert.ok(lastAudioInstance);
+});
+
+test("review regressions: empty WAV throws, CLI validates flags & voices schema, and mid-batch failure syncs partial manifest", async () => {
+  const { parseWavPcm16 } = await import("../lib/wav-to-mp3.mjs");
+  const { parseCliArgs, formatVoiceEntry, runGenerator } = await import("../generate-tts.mjs");
+
+  // Minor #8: 0-byte data chunk throws instead of encoding silent MP3
+  const emptyHdr = Buffer.alloc(44);
+  emptyHdr.write("RIFF", 0); emptyHdr.writeUInt32LE(36, 4); emptyHdr.write("WAVEfmt ", 8);
+  emptyHdr.writeUInt32LE(16, 16); emptyHdr.writeUInt16LE(1, 20); emptyHdr.writeUInt16LE(1, 22);
+  emptyHdr.writeUInt32LE(24000, 24); emptyHdr.writeUInt32LE(48000, 28); emptyHdr.writeUInt16LE(2, 32);
+  emptyHdr.writeUInt16LE(16, 34); emptyHdr.write("data", 36); emptyHdr.writeUInt32LE(0, 40);
+  assert.throws(() => parseWavPcm16(emptyHdr), /empty PCM data/i);
+
+  // Important #6: parseCliArgs supports --key=value and throws on unknown/malformed flags
+  const parsed = parseCliArgs(["--unit=u12", "--sample", "6", "--force"]);
+  assert.equal(parsed.unit, "u12");
+  assert.equal(parsed.sample, 6);
+  assert.equal(parsed.force, true);
+  assert.throws(() => parseCliArgs(["--matches", "tired", "--force"]), /Unknown option/i);
+  assert.throws(() => parseCliArgs(["--sample", "abc"]), /Invalid numeric value/i);
+  assert.throws(() => parseCliArgs(["--match", "--force"]), /Missing value/i);
+
+  // Important #3: formatVoiceEntry reads Gemini v1beta Voices schema (id + display_name)
+  const line = formatVoiceEntry({ id: "Aoede", display_name: "Aoede", gender: "female", description: "Breezy and natural" });
+  assert.ok(line.includes("Aoede") && !line.includes("undefined"), line);
+
+  // Important #5: Mid-batch error syncs completed MP3s to manifest before rethrowing
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ef-tts-partial-"));
+  const audioDir = path.join(tmpDir, "audio");
+  const manifestPath = path.join(tmpDir, "audio-manifest.js");
+  try {
+    const pcm = Buffer.alloc(4800);
+    const hdr = Buffer.alloc(44);
+    hdr.write("RIFF", 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write("WAVEfmt ", 8);
+    hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22);
+    hdr.writeUInt32LE(24000, 24); hdr.writeUInt32LE(48000, 28); hdr.writeUInt16LE(2, 32);
+    hdr.writeUInt16LE(16, 34); hdr.write("data", 36); hdr.writeUInt32LE(pcm.length, 40);
+    const b64Wav = Buffer.concat([hdr, pcm]).toString("base64");
+
+    let count = 0;
+    const partialFetch = async () => {
+      count++;
+      if (count === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            steps: [{ type: "model_output", content: [{ type: "audio", mime_type: "audio/wav", data: b64Wav }] }]
+          })
+        };
+      }
+      return { ok: false, status: 400, headers: { get: () => null }, text: async () => "quota exceeded" };
+    };
+
+    await assert.rejects(
+      () => runGenerator({
+        apiKey: "test-key",
+        items: [
+          { id: "aaaaaaaa", cleaned: "Hello there.", category: "answer" },
+          { id: "bbbbbbbb", cleaned: "Second sentence.", category: "answer" }
+        ],
+        audioDir, manifestPath, delayMs: 0, baseBackoffMs: 1, maxRetries: 0, fetchImpl: partialFetch, quiet: true
+      }),
+      /HTTP 400/
+    );
+
+    assert.equal(fs.existsSync(manifestPath), true, "Manifest should be synced even when batch aborts mid-way");
+    assert.ok(fs.readFileSync(manifestPath, "utf8").includes('"aaaaaaaa":1'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

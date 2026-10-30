@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { extractSpeakableCorpus, buildExpressiveTurn } from "./lib/corpus-prosody.mjs";
+import {
+  extractSpeakableCorpus,
+  buildExpressiveTurn,
+  isGratitudeReaction
+} from "./lib/corpus-prosody.mjs";
 import { wavBufferToMp3 } from "./lib/wav-to-mp3.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +15,7 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 const INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const VOICES_URL = "https://generativelanguage.googleapis.com/v1beta/voices?language_code=en-GB&type=prebuilt";
+const PLACEHOLDER_KEY = "your_google_ai_studio_key_here";
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -210,7 +215,7 @@ export function pickBalancedSample(allItems, count) {
     const list = buckets.get(item.category) || buckets.get("answer");
     if (
       item.category === "p2_feelings_problem" &&
-      !/^(thank|thanks|that's a (good|great)|you're so kind|good idea|okay|alright)/i.test(item.cleaned)
+      !isGratitudeReaction(item.cleaned)
     ) {
       // Prioritize genuine distress lines first so --sample showcases <sigh> acting
       list.unshift(item);
@@ -254,7 +259,7 @@ export async function runGenerator({
   fetchImpl = globalThis.fetch,
   quiet = false
 }) {
-  if (!apiKey || apiKey === "your_google_ai_studio_key_here") {
+  if (!apiKey || apiKey === PLACEHOLDER_KEY) {
     throw new Error(
       "Missing GEMINI_API_KEY. Copy .env.example to .env and paste your free Google AI Studio key (https://aistudio.google.com/apikey)."
     );
@@ -265,50 +270,59 @@ export async function runGenerator({
   let generated = 0;
   let skipped = 0;
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const outPath = path.join(audioDir, `${item.id}.mp3`);
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const outPath = path.join(audioDir, `${item.id}.mp3`);
 
-    if (!force && fs.existsSync(outPath)) {
+      if (!force && fs.existsSync(outPath)) {
+        try {
+          if (fs.statSync(outPath).size > 0) {
+            skipped++;
+            continue;
+          }
+        } catch {}
+      }
+
+      const turn = buildExpressiveTurn(item);
+      if (!quiet) {
+        console.log(
+          `[${i + 1}/${items.length}] ${item.id} (${item.category}) ${item.cleaned}`
+        );
+      }
+
+      const wavBuf = await synthesizeGeminiWav({
+        apiKey,
+        model,
+        voice,
+        text: turn.text,
+        style: turn.style,
+        maxRetries,
+        baseBackoffMs,
+        fetchImpl
+      });
+
+      const mp3Buf = wavBufferToMp3(wavBuf, kbps);
+      const tmpPath = `${outPath}.tmp`;
+      fs.writeFileSync(tmpPath, mp3Buf);
+      fs.renameSync(tmpPath, outPath);
+      generated++;
+
+      if (generated % 10 === 0) {
+        syncAudioManifest({ audioDir, manifestPath, activeIds: null, pruneOrphans: false });
+      }
+
+      if (delayMs > 0 && i < items.length - 1) {
+        await sleep(delayMs);
+      }
+    }
+  } catch (err) {
+    if (generated > 0) {
       try {
-        if (fs.statSync(outPath).size > 0) {
-          skipped++;
-          continue;
-        }
+        syncAudioManifest({ audioDir, manifestPath, activeIds: null, pruneOrphans: false });
       } catch {}
     }
-
-    const turn = buildExpressiveTurn(item);
-    if (!quiet) {
-      console.log(
-        `[${i + 1}/${items.length}] ${item.id} (${item.category}) ${item.cleaned}`
-      );
-    }
-
-    const wavBuf = await synthesizeGeminiWav({
-      apiKey,
-      model,
-      voice,
-      text: turn.text,
-      style: turn.style,
-      maxRetries,
-      baseBackoffMs,
-      fetchImpl
-    });
-
-    const mp3Buf = wavBufferToMp3(wavBuf, kbps);
-    const tmpPath = `${outPath}.tmp`;
-    fs.writeFileSync(tmpPath, mp3Buf);
-    fs.renameSync(tmpPath, outPath);
-    generated++;
-
-    if (generated % 10 === 0) {
-      syncAudioManifest({ audioDir, manifestPath, activeIds: null, pruneOrphans: false });
-    }
-
-    if (delayMs > 0 && i < items.length - 1) {
-      await sleep(delayMs);
-    }
+    throw err;
   }
 
   const effectiveActiveIds =
@@ -329,7 +343,7 @@ export async function runGenerator({
   };
 }
 
-function parseCliArgs(argv) {
+export function parseCliArgs(argv) {
   const opts = {
     sample: 0,
     match: "",
@@ -344,21 +358,70 @@ function parseCliArgs(argv) {
     help: false
   };
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--sample") opts.sample = Number(argv[++i] || 6);
-    else if (arg === "--match") opts.match = String(argv[++i] || "");
-    else if (arg === "--unit") opts.unit = String(argv[++i] || "");
-    else if (arg === "--level") opts.level = String(argv[++i] || "").toUpperCase();
-    else if (arg === "--voice") opts.voice = String(argv[++i] || "Aoede");
-    else if (arg === "--delay-ms") opts.delayMs = Number(argv[++i] || 350);
-    else if (arg === "--lite") opts.lite = true;
-    else if (arg === "--force") opts.force = true;
-    else if (arg === "--no-prune") opts.pruneOrphans = false;
-    else if (arg === "--list-voices") opts.listVoices = true;
-    else if (arg === "--help" || arg === "-h") opts.help = true;
+  const expanded = [];
+  for (const token of argv) {
+    if (token.startsWith("--") && token.includes("=")) {
+      const eq = token.indexOf("=");
+      expanded.push(token.slice(0, eq), token.slice(eq + 1));
+    } else {
+      expanded.push(token);
+    }
+  }
+
+  const takeValue = (flag, idx) => {
+    const next = expanded[idx + 1];
+    if (next === undefined || next === "" || next.startsWith("-")) {
+      throw new Error(`Missing value for ${flag}`);
+    }
+    return next;
+  };
+
+  for (let i = 0; i < expanded.length; i++) {
+    const arg = expanded[i];
+    if (arg === "--sample") {
+      const raw = takeValue(arg, i++);
+      const num = Number(raw);
+      if (!Number.isInteger(num) || num <= 0) {
+        throw new Error(`Invalid numeric value for --sample: ${raw}`);
+      }
+      opts.sample = num;
+    } else if (arg === "--match") {
+      opts.match = takeValue(arg, i++);
+    } else if (arg === "--unit") {
+      opts.unit = takeValue(arg, i++);
+    } else if (arg === "--level") {
+      opts.level = takeValue(arg, i++).toUpperCase();
+    } else if (arg === "--voice") {
+      opts.voice = takeValue(arg, i++);
+    } else if (arg === "--delay-ms") {
+      const raw = takeValue(arg, i++);
+      const num = Number(raw);
+      if (!Number.isFinite(num) || num < 0) {
+        throw new Error(`Invalid numeric value for --delay-ms: ${raw}`);
+      }
+      opts.delayMs = num;
+    } else if (arg === "--lite") {
+      opts.lite = true;
+    } else if (arg === "--force") {
+      opts.force = true;
+    } else if (arg === "--no-prune") {
+      opts.pruneOrphans = false;
+    } else if (arg === "--list-voices") {
+      opts.listVoices = true;
+    } else if (arg === "--help" || arg === "-h") {
+      opts.help = true;
+    } else {
+      throw new Error(`Unknown option: ${arg} (run with --help for usage)`);
+    }
   }
   return opts;
+}
+
+export function formatVoiceEntry(v) {
+  const id = v.id || v.voiceId || v.name || "unknown";
+  const label = v.display_name && v.display_name !== id ? `${id} [${v.display_name}]` : id;
+  const meta = [v.gender, v.accent].filter(Boolean).join(", ") || "voice";
+  return `  - ${label} (${meta}): ${v.description || ""}`.trimEnd();
 }
 
 async function listAvailableVoices(apiKey) {
@@ -372,7 +435,7 @@ async function listAvailableVoices(apiKey) {
   const voices = data.voices || [];
   console.log(`Available en-GB prebuilt voices (${voices.length}):`);
   for (const v of voices) {
-    console.log(`  - ${v.voiceId || v.name} (${v.gender || "voice"}): ${v.description || ""}`);
+    console.log(formatVoiceEntry(v));
   }
 }
 
@@ -399,7 +462,11 @@ Options:
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (opts.listVoices) {
-    if (!apiKey) throw new Error("Set GEMINI_API_KEY in .env first to list voices.");
+    if (!apiKey || apiKey === PLACEHOLDER_KEY) {
+      throw new Error(
+        "Missing GEMINI_API_KEY. Copy .env.example to .env and paste your free Google AI Studio key (https://aistudio.google.com/apikey)."
+      );
+    }
     await listAvailableVoices(apiKey);
     return;
   }
@@ -412,10 +479,17 @@ Options:
 
   let targetItems = fullCorpus;
   if (opts.level) {
-    targetItems = targetItems.filter(x => x.level === opts.level);
+    targetItems = targetItems.filter(x =>
+      Array.isArray(x.levels) ? x.levels.includes(opts.level) : x.level === opts.level
+    );
   }
   if (opts.unit) {
-    targetItems = targetItems.filter(x => x.unitKey.toLowerCase() === opts.unit.toLowerCase());
+    const unitNeedle = opts.unit.toLowerCase();
+    targetItems = targetItems.filter(x =>
+      Array.isArray(x.unitKeys)
+        ? x.unitKeys.some(u => u.toLowerCase() === unitNeedle)
+        : x.unitKey.toLowerCase() === unitNeedle
+    );
   }
   if (opts.match) {
     const needle = opts.match.toLowerCase();
