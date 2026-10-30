@@ -741,90 +741,6 @@ function renderMode(app) {
   `;
 }
 
-// Prominent 50/50 Dual-Task Switcher for Level A2 Part 2 (Task 1: Spot Differences vs Task 2: Feelings & Advice)
-function renderA2TaskSwitcher() {
-  const isSpot = state.scenarioIdx === 0;
-  const isFeel = state.scenarioIdx === 1;
-  return `
-    <div class="a2-task-switcher" role="tablist" aria-label="Level A2 Part 2 Exam Tasks">
-      <button type="button" class="a2-task-tab tab-spot ${isSpot ? 'active active-spot' : ''}" onclick="switchA2Task(0, false)">
-        <span class="a2-tab-ico">${ICONS.image}</span>
-        <span class="a2-tab-text">
-          <span class="a2-tab-kicker">Part 2 • Task 1</span>
-          <span class="a2-tab-name">Spot Differences</span>
-        </span>
-      </button>
-      <button type="button" class="a2-task-tab tab-feelings ${isFeel ? 'active active-feelings' : ''}" onclick="switchA2Task(1, false)">
-        <span class="a2-tab-ico">${ICONS.heartChat}</span>
-        <span class="a2-tab-text">
-          <span class="a2-tab-kicker">Part 2 • Task 2</span>
-          <span class="a2-tab-name">Feelings &amp; Advice</span>
-        </span>
-      </button>
-    </div>
-  `;
-}
-
-// Bottom Call-to-Action Card in Level A2 Part 2 so students never forget to practice the other Part 2 format
-function renderA2NextTaskBanner() {
-  if (state.level !== "A2") return "";
-  if (state.scenarioIdx === 0) {
-    return `
-      <button type="button" class="next-task-banner to-feelings" onclick="switchA2Task(1, true)">
-        <div class="next-task-left">
-          <div class="next-task-icon">${ICONS.heartChat}</div>
-          <div class="next-task-copy">
-            <span class="next-task-kicker">Next Part 2 Task • Luyện tiếp dạng đề 2</span>
-            <span class="next-task-title">Task 2: Feelings &amp; Advice ("What's the matter?")</span>
-            <span class="next-task-sub">4-step problem &amp; advice role-play (Role ${state.role})</span>
-          </div>
-        </div>
-        <span class="next-task-arrow">${ICONS.arrowRight}</span>
-      </button>
-    `;
-  }
-  return `
-    <button type="button" class="next-task-banner to-spot" onclick="switchA2Task(0, true)">
-      <div class="next-task-left">
-        <div class="next-task-icon">${ICONS.image}</div>
-        <div class="next-task-copy">
-          <span class="next-task-kicker">Other Part 2 Task • Chuyển sang dạng đề 1</span>
-          <span class="next-task-title">Task 1: Spot the Differences</span>
-          <span class="next-task-sub">Compare Picture A &amp; Picture B (Role ${state.role})</span>
-        </div>
-      </div>
-      <span class="next-task-arrow">${ICONS.arrowRight}</span>
-    </button>
-  `;
-}
-
-function switchA2Task(targetIdx, shouldScrollTop) {
-  const data = getLevelData();
-  const unit = data && data[state.unitKey];
-  if (!unit || !unit.part2 || !unit.part2.scenarios[targetIdx]) return;
-  if (state.scenarioIdx === targetIdx && !shouldScrollTop) return;
-
-  const nextEntry = unit.part2.scenarios[targetIdx];
-  state.scenarioIdx = targetIdx;
-  if (nextEntry.variants && nextEntry.variants.length > 0) {
-    state.variantIdx = state.variantIdx % nextEntry.variants.length;
-  } else {
-    state.variantIdx = 0;
-  }
-  clearHints();
-  if (state.screen === "scene_p2") {
-    resetTimer();
-  }
-  render();
-  if (shouldScrollTop && typeof window.scrollTo === "function") {
-    try {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (e) {
-      window.scrollTo(0, 0);
-    }
-  }
-}
-
 function renderRoleSelect(app) {
   const data = getLevelData();
   const unit = data[state.unitKey];
@@ -832,17 +748,27 @@ function renderRoleSelect(app) {
   const isFinal = state.unitKey === "final";
   const isA2 = state.level === "A2";
 
-  let switcherHtml = "";
+  let topInfoHtml = "";
   if (isA2) {
-    switcherHtml = renderA2TaskSwitcher();
+    const isFeel = state.scenarioIdx === 1;
+    const chipClass = isFeel ? "chip-feelings" : "chip-spot";
+    const chipIcon = isFeel ? ICONS.heartChat : ICONS.image;
+    const chipLabel = isFeel
+      ? `Part 2B • Feelings &amp; Advice ("What's the matter?")`
+      : `Part 2A • Spot the Differences`;
+    topInfoHtml = `
+      <div style="text-align:center; margin-bottom:10px;">
+        <span class="a2-active-chip ${chipClass}">${chipIcon} <span>${chipLabel}</span></span>
+      </div>
+    `;
   } else {
-    switcherHtml = `<div class="scenario-pills" style="justify-content:center; margin-bottom:10px;">`;
+    topInfoHtml = `<div class="scenario-pills" style="justify-content:center; margin-bottom:10px;">`;
     scenarios.forEach((sc, idx) => {
       const active = idx === state.scenarioIdx ? "active" : "";
       const text = sc.label || `Scenario ${idx + 1}`;
-      switcherHtml += `<div class="pill ${active}" onclick="selectScenario(${idx})">${text}</div>`;
+      topInfoHtml += `<div class="pill ${active}" onclick="selectScenario(${idx})">${text}</div>`;
     });
-    switcherHtml += `</div>`;
+    topInfoHtml += `</div>`;
   }
 
   let variantHtml = "";
@@ -856,11 +782,13 @@ function renderRoleSelect(app) {
     variantHtml += `</div>`;
   }
 
-  const titleText = isA2 ? "Choose Part 2 Task &amp; Role" : "Choose Scenario &amp; Role";
+  const titleText = isA2
+    ? (isFinal ? "Choose Exam Set &amp; Role" : "Choose Your Role")
+    : "Choose Scenario &amp; Role";
 
   app.innerHTML = `
     <div class="screen-title">${titleText}</div>
-    ${switcherHtml}
+    ${topInfoHtml}
     ${variantHtml}
     <div class="grid grid-2">
       <div class="big-card role-btn-a" onclick="navigate({screen: 'scene_p2', role: 'A'})">
@@ -1243,7 +1171,6 @@ function renderSpotDiffBody(sd) {
     </div>
 
     ${renderFollowUpCard(followUpItem)}
-    ${renderA2NextTaskBanner()}
     ${zoomModalHtml}
   `;
 }
@@ -1268,12 +1195,12 @@ function renderPart2Scene(app) {
 
   let topControlsHtml = "";
   if (isA2) {
+    const isFeel = state.scenarioIdx === 1;
     const leftMetaHtml = isFinal
-      ? `<div class="scenario-pills">${variantBtnHtml}<button class="pill pill-icon" onclick="randomFinalScenario()" title="Random Task & Set">${ICONS.shuffle}</button></div>`
-      : `<span class="a2-active-chip ${state.scenarioIdx === 1 ? 'chip-feelings' : 'chip-spot'}">${state.scenarioIdx === 1 ? "Task 2 • What's the matter?" : "Task 1 • Compare Pic A &amp; B"}</span>`;
+      ? `<div class="scenario-pills">${variantBtnHtml}<button class="pill pill-icon" onclick="randomFinalScenario()" title="Random Exam Set">${ICONS.shuffle}</button></div>`
+      : `<span class="a2-active-chip ${isFeel ? 'chip-feelings' : 'chip-spot'}">${isFeel ? `${ICONS.heartChat} <span>Part 2B • What's the matter?</span>` : `${ICONS.image} <span>Part 2A • Spot Differences</span>`}</span>`;
 
     topControlsHtml = `
-      ${renderA2TaskSwitcher()}
       <div class="top-controls">
         ${leftMetaHtml}
         <div class="role-switch-group">
@@ -1447,13 +1374,11 @@ function renderPart2Scene(app) {
     : (giveOrMapHtml + askSectionHtml);
 
   const followUpHtml = renderFollowUpCard(roleData.followUp);
-  const nextTaskHtml = renderA2NextTaskBanner();
 
   app.innerHTML = `
     ${topControlsHtml}
     ${mainBodyHtml}
     ${followUpHtml}
-    ${nextTaskHtml}
   `;
 }
 
@@ -1469,6 +1394,19 @@ function cycleFinalVariant() {
 function randomFinalScenario() {
   const data = getLevelData();
   const scenarios = data.final.part2.scenarios;
+  if (state.level === "A2") {
+    const entry = scenarios[state.scenarioIdx];
+    const vars = entry && entry.variants;
+    if (vars && vars.length > 1) {
+      let nextVar = Math.floor(Math.random() * vars.length);
+      if (nextVar === state.variantIdx) nextVar = (nextVar + 1) % vars.length;
+      state.variantIdx = nextVar;
+    }
+    clearHints();
+    resetTimer();
+    render();
+    return;
+  }
   const count = scenarios.length;
   let nextTask = Math.floor(Math.random() * count);
   if (nextTask === state.scenarioIdx && count > 1) nextTask = (nextTask + 1) % count;
@@ -1541,10 +1479,10 @@ const TOUR_DEFS = {
   ],
   role: [
     {
-      selector: ".a2-task-switcher, .scenario-pills",
-      title: "Select Task / Scenario • Chọn dạng đề",
-      en: "Pick your Part 2 task or scenario set above before entering your role-play card.",
-      vi: "Chọn dạng đề hoặc kịch bản ở thanh phía trên trước khi bắt đầu đóng vai."
+      selector: ".scenario-pills",
+      title: "Select Set / Scenario • Chọn bộ đề",
+      en: "Pick a scenario or exam set above before entering your role-play card.",
+      vi: "Chọn kịch bản hoặc bộ đề ở thanh phía trên trước khi bắt đầu đóng vai."
     },
     {
       selector: ".grid-2",
