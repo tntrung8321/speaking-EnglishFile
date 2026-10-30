@@ -28,6 +28,13 @@
 /.claude/
 /.gemini/
 /.vscode/
+/docs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Secrets & local Node generator dependencies (NEVER upload API keys)
+.env
+.env.*
+node_modules/
+scripts/node_modules/

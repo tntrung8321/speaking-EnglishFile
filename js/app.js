@@ -261,6 +261,24 @@ function splitSentenceChunks(text, maxLen = 175) {
   return chunks.length ? chunks : [text];
 }
 
+function computeAudioId(cleanedText) {
+  const norm = String(cleanedText || "").trim().replace(/\s+/g, " ");
+  let bytes;
+  if (typeof TextEncoder !== "undefined") {
+    bytes = new TextEncoder().encode(norm);
+  } else {
+    const arr = [];
+    for (let i = 0; i < norm.length; i++) arr.push(norm.charCodeAt(i) & 0xff);
+    bytes = arr;
+  }
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= bytes[i];
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 function speakSentence(event, rawText) {
   if (event) {
     event.stopPropagation();
@@ -271,47 +289,84 @@ function speakSentence(event, rawText) {
 
   stopAllAudio();
 
-  if (navigator.onLine !== false) {
+  const playFallback = () => {
+    if (navigator.onLine !== false) {
+      try {
+        if (!sharedAudio) {
+          sharedAudio = new Audio();
+          sharedAudio.referrerPolicy = "no-referrer";
+        }
+        const chunks = splitSentenceChunks(cleaned, 175);
+        let idx = 0;
+
+        const playNextChunk = () => {
+          if (idx >= chunks.length) {
+            clearActiveSpkBtn();
+            return;
+          }
+          const chunk = chunks[idx++];
+          sharedAudio.onended = () => playNextChunk();
+          sharedAudio.onerror = () => {
+            sharedAudio.onended = null;
+            sharedAudio.onerror = null;
+            speakViaWebSpeech(cleaned, btn);
+          };
+          sharedAudio.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en-GB&q=${encodeURIComponent(chunk)}`;
+          const p = sharedAudio.play();
+          if (p && typeof p.catch === "function") {
+            p.catch(() => {
+              sharedAudio.onended = null;
+              sharedAudio.onerror = null;
+              speakViaWebSpeech(cleaned, btn);
+            });
+          }
+        };
+
+        setActiveSpkBtn(btn);
+        playNextChunk();
+        return;
+      } catch (e) {
+        // Fall through to Web Speech API
+      }
+    }
+    speakViaWebSpeech(cleaned, btn);
+  };
+
+  // Prefer pre-generated expressive Gemini 3.8 TTS MP3 when listed in AUDIO_MANIFEST
+  const audioId = computeAudioId(cleaned);
+  const manifest = typeof window !== "undefined" && window.AUDIO_MANIFEST;
+  if (manifest && manifest[audioId]) {
     try {
       if (!sharedAudio) {
         sharedAudio = new Audio();
         sharedAudio.referrerPolicy = "no-referrer";
       }
-      const chunks = splitSentenceChunks(cleaned, 175);
-      let idx = 0;
-
-      const playNextChunk = () => {
-        if (idx >= chunks.length) {
-          clearActiveSpkBtn();
-          return;
-        }
-        const chunk = chunks[idx++];
-        sharedAudio.onended = () => playNextChunk();
-        sharedAudio.onerror = () => {
+      sharedAudio.onended = () => {
+        sharedAudio.onended = null;
+        clearActiveSpkBtn();
+      };
+      sharedAudio.onerror = () => {
+        sharedAudio.onended = null;
+        sharedAudio.onerror = null;
+        playFallback();
+      };
+      setActiveSpkBtn(btn);
+      sharedAudio.src = `audio/${audioId}.mp3`;
+      const p = sharedAudio.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
           sharedAudio.onended = null;
           sharedAudio.onerror = null;
-          speakViaWebSpeech(cleaned, btn);
-        };
-        sharedAudio.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en-GB&q=${encodeURIComponent(chunk)}`;
-        const p = sharedAudio.play();
-        if (p && typeof p.catch === "function") {
-          p.catch(() => {
-            sharedAudio.onended = null;
-            sharedAudio.onerror = null;
-            speakViaWebSpeech(cleaned, btn);
-          });
-        }
-      };
-
-      setActiveSpkBtn(btn);
-      playNextChunk();
+          playFallback();
+        });
+      }
       return;
     } catch (e) {
-      // Fall through to Web Speech API
+      // Fall through to online fallback
     }
   }
 
-  speakViaWebSpeech(cleaned, btn);
+  playFallback();
 }
 
 function speakWord(event, word) {
