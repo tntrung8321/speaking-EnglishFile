@@ -10,11 +10,19 @@
 <body oncontextmenu="return false;">
 
   <header>
-    <button class="nav-btn" id="backBtn" onclick="goBack()" style="visibility: hidden;">← Back</button>
+    <button class="nav-btn nav-back-btn" id="backBtn" onclick="goBack()" style="visibility: hidden;">
+      <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Back</span>
+    </button>
     <div class="header-center" id="headerCenter">
       <div class="brand">English File A1</div>
     </div>
-    <button class="nav-btn" onclick="goHome()">Home</button>
+    <div class="header-right">
+      <button class="help-btn" id="helpBtn" onclick="startCurrentScreenTour(event)" title="Guide / Hướng dẫn sử dụng" aria-label="Guide">
+        <svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.4 9.3a2.7 2.7 0 1 1 3.9 2.4c-.9.5-1.3 1-1.3 2"/><circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="nav-btn" onclick="goHome()">Home</button>
+    </div>
   </header>
 
   <div class="container" id="app"></div>
@@ -22,6 +30,9 @@
   <footer class="site-footer">
     Developed based on <strong>Oxford English File</strong> and the speaking test format of <strong>Industrial University of Ho Chi Minh City (IUH)</strong>.
   </footer>
+
+  <!-- Interactive Spotlight Walkthrough Overlay -->
+  <div id="tourOverlay" class="tour-overlay" aria-hidden="true"></div>
 
   <!-- Modular Data Store (Compatible with both GitHub Pages & local file://) -->
   <script src="data/a1.js"></script>
