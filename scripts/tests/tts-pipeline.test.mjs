@@ -121,3 +121,35 @@ test("extractSpeakableCorpus deduplicates ~736 sentences with matching IDs and b
   });
   assert.ok(diff.text.includes("<short pause> whereas in Picture B"), diff.text);
 });
+
+
+test("parseWavPcm16 skips extra RIFF LIST chunks and wavBufferToMp3 outputs compact valid MP3", async () => {
+  const { parseWavPcm16, wavBufferToMp3 } = await import("../lib/wav-to-mp3.mjs");
+  // Build 0.25s 24kHz mono 16-bit sine wave WAV with an extra 16-byte JUNK chunk before data
+  const sampleRate = 24000;
+  const numSamples = 6000;
+  const pcm = Buffer.alloc(numSamples * 2);
+  for (let i = 0; i < numSamples; i++) {
+    pcm.writeInt16LE(Math.round(Math.sin(i * 0.1) * 12000), i * 2);
+  }
+  const fmt = Buffer.alloc(24);
+  fmt.write("fmt ", 0); fmt.writeUInt32LE(16, 4); fmt.writeUInt16LE(1, 8); fmt.writeUInt16LE(1, 10);
+  fmt.writeUInt32LE(sampleRate, 12); fmt.writeUInt32LE(sampleRate * 2, 16); fmt.writeUInt16LE(2, 20); fmt.writeUInt16LE(16, 22);
+  const junk = Buffer.alloc(16);
+  junk.write("JUNK", 0); junk.writeUInt32LE(8, 4);
+  const dataHdr = Buffer.alloc(8);
+  dataHdr.write("data", 0); dataHdr.writeUInt32LE(pcm.length, 4);
+  const riff = Buffer.alloc(12);
+  const bodyLen = 4 + fmt.length + junk.length + dataHdr.length + pcm.length;
+  riff.write("RIFF", 0); riff.writeUInt32LE(bodyLen, 4); riff.write("WAVE", 8);
+  const wav = Buffer.concat([riff, fmt, junk, dataHdr, pcm]);
+
+  const parsed = parseWavPcm16(wav);
+  assert.equal(parsed.sampleRate, 24000);
+  assert.equal(parsed.channels, 1);
+  assert.equal(parsed.samples.length, numSamples);
+
+  const mp3 = wavBufferToMp3(wav, 48);
+  assert.ok(mp3.length > 400 && mp3.length < wav.length / 2, `Unexpected MP3 size ${mp3.length}`);
+  assert.equal(mp3[0], 0xff); // MPEG frame sync byte
+});
