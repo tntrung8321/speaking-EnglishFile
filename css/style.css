@@ -680,6 +680,54 @@ header {
   border: 1.5px solid var(--ask-border);
 }
 
+.card-icon-svg.icon-feelings {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1.5px solid #fdba74;
+}
+
+/* Level A2 Mode Screen Task Badges & Elevated Part 2 Cards */
+.mode-task-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+
+.mode-badge-p1 {
+  background: var(--primary-bg);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+}
+
+.mode-badge-spot {
+  background: var(--ask-bg);
+  color: var(--ask-color);
+  border: 1px solid var(--ask-border);
+}
+
+.mode-badge-feelings {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.big-card.mode-card-spot {
+  border-color: var(--ask-border);
+  border-bottom-color: var(--ask-color);
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+}
+
+.big-card.mode-card-feelings {
+  border-color: #fdba74;
+  border-bottom-color: #c2410c;
+  background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  box-shadow: 0 3px 12px rgba(194, 65, 12, 0.08);
+}
+
 .qa-num {
   display: inline-flex;
   align-items: center;
@@ -883,6 +931,282 @@ header {
 }
 
 /* ==================== PART 2 CONTROLS BAR ==================== */
+/* Level A2 Prominent 50/50 Dual-Task Switcher */
+.a2-task-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  background: #e2e8f0;
+  padding: 5px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  margin-bottom: 10px;
+}
+
+.a2-task-tab {
+  border: 1.5px solid transparent;
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+  min-width: 0;
+  font-family: inherit;
+  color: var(--text-secondary);
+  transition:
+    transform 0.18s var(--spring),
+    background-color 0.18s var(--spring),
+    border-color 0.16s ease,
+    box-shadow 0.18s var(--spring),
+    color 0.15s ease;
+}
+
+.a2-task-tab:active {
+  transform: scale(0.97);
+}
+
+.a2-tab-ico {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.a2-task-tab.tab-spot .a2-tab-ico {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: var(--ask-color);
+}
+
+.a2-task-tab.tab-feelings {
+  background: rgba(255, 247, 237, 0.85);
+  border-color: rgba(253, 186, 116, 0.72);
+}
+
+.a2-task-tab.tab-feelings .a2-tab-ico {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #c2410c;
+}
+
+.a2-task-tab.active-spot {
+  background: #ffffff;
+  border-color: var(--ask-border);
+  border-bottom-width: 2.5px;
+  border-bottom-color: var(--ask-color);
+  color: var(--ask-color);
+  box-shadow: 0 3px 9px rgba(67, 56, 202, 0.14);
+}
+
+.a2-task-tab.active-spot .a2-tab-ico {
+  background: var(--ask-color);
+  border-color: var(--ask-color);
+  color: #ffffff;
+}
+
+.a2-task-tab.active-feelings {
+  background: #ffffff;
+  border-color: #fdba74;
+  border-bottom-width: 2.5px;
+  border-bottom-color: #c2410c;
+  color: #c2410c;
+  box-shadow: 0 3px 9px rgba(194, 65, 12, 0.15);
+}
+
+.a2-task-tab.active-feelings .a2-tab-ico {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: #ffffff;
+}
+
+.a2-tab-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.a2-tab-kicker {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  opacity: 0.82;
+  line-height: 1.15;
+}
+
+.a2-tab-name {
+  font-size: 0.81rem;
+  font-weight: 800;
+  letter-spacing: -0.15px;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.a2-task-tab.active-spot .a2-tab-name {
+  color: var(--ask-color);
+}
+
+.a2-task-tab.active-feelings .a2-tab-name {
+  color: #c2410c;
+}
+
+.a2-active-chip {
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.a2-active-chip.chip-spot {
+  background: var(--ask-bg);
+  color: var(--ask-color);
+  border: 1.5px solid var(--ask-border);
+}
+
+.a2-active-chip.chip-feelings {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1.5px solid #fdba74;
+}
+
+/* Bottom Call-to-Action Card for Switching A2 Part 2 Tasks */
+.next-task-banner {
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  border-bottom-width: 3.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  text-align: left;
+  font-family: inherit;
+  transition: transform 0.18s var(--spring), box-shadow 0.18s var(--spring), filter 0.15s ease;
+}
+
+.next-task-banner:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.next-task-banner.to-feelings {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-color: #fdba74;
+  border-bottom-color: #c2410c;
+  box-shadow: 0 4px 12px rgba(194, 65, 12, 0.10);
+}
+
+.next-task-banner.to-spot {
+  background: linear-gradient(135deg, #f5f7ff 0%, #eef2ff 100%);
+  border-color: var(--ask-border);
+  border-bottom-color: var(--ask-color);
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.09);
+}
+
+.next-task-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  flex: 1;
+}
+
+.next-task-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.next-task-banner.to-feelings .next-task-icon {
+  color: #c2410c;
+  border: 1.5px solid #fdba74;
+  box-shadow: 0 2px 5px rgba(194, 65, 12, 0.08);
+}
+
+.next-task-banner.to-spot .next-task-icon {
+  color: var(--ask-color);
+  border: 1.5px solid var(--ask-border);
+  box-shadow: 0 2px 5px rgba(67, 56, 202, 0.08);
+}
+
+.next-task-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-task-kicker {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  line-height: 1.2;
+}
+
+.next-task-banner.to-feelings .next-task-kicker {
+  color: #c2410c;
+}
+
+.next-task-banner.to-spot .next-task-kicker {
+  color: var(--ask-color);
+}
+
+.next-task-title {
+  font-size: 0.89rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.15px;
+  line-height: 1.28;
+}
+
+.next-task-sub {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.28;
+}
+
+.next-task-arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.next-task-banner.to-feelings .next-task-arrow {
+  color: #c2410c;
+  border: 1.5px solid #fdba74;
+}
+
+.next-task-banner.to-spot .next-task-arrow {
+  color: var(--ask-color);
+  border: 1.5px solid var(--ask-border);
+}
+
 .top-controls {
   display: flex;
   align-items: center;
@@ -2216,5 +2540,38 @@ header {
   .bldg-known.peeking .bldg-name {
     font-size: 0.72rem;
     line-height: 1.28;
+  }
+  .a2-task-switcher {
+    padding: 4px;
+    gap: 5px;
+  }
+  .a2-task-tab {
+    padding: 7px 7px;
+    gap: 6px;
+  }
+  .a2-tab-ico {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+  .a2-tab-kicker {
+    font-size: 0.58rem;
+  }
+  .a2-tab-name {
+    font-size: 0.75rem;
+  }
+  .next-task-banner {
+    padding: 11px 11px;
+    gap: 8px;
+  }
+  .next-task-icon {
+    width: 34px;
+    height: 34px;
+  }
+  .next-task-title {
+    font-size: 0.83rem;
+  }
+  .next-task-sub {
+    font-size: 0.71rem;
   }
 }

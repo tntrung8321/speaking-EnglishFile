@@ -40,6 +40,9 @@ const ICONS = {
   users: `<svg class="ui-ico ui-ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   chat: `<svg class="ui-ico ui-ico-xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
   image: `<svg class="ui-ico ui-ico-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>`,
+  imageLg: `<svg class="ui-ico ui-ico-lg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>`,
+  heartChat: `<svg class="ui-ico ui-ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 12.8s-3.2-1.95-3.2-3.95a1.85 1.85 0 0 1 3.2-1.25 1.85 1.85 0 0 1 3.2 1.25c0 2-3.2 3.95-3.2 3.95Z"/></svg>`,
+  heartChatLg: `<svg class="ui-ico ui-ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 12.8s-3.2-1.95-3.2-3.95a1.85 1.85 0 0 1 3.2-1.25 1.85 1.85 0 0 1 3.2 1.25c0 2-3.2 3.95-3.2 3.95Z"/></svg>`,
   map: `<svg class="ui-ico ui-ico-xs" viewBox="0 0 24 24" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>`,
   pin: `<svg class="ui-ico ui-ico-xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`,
   arrowRight: `<svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>`,
@@ -672,13 +675,42 @@ function renderHome(app) {
 function renderMode(app) {
   const data = getLevelData();
   const unit = data[state.unitKey];
-  const p1Sub = state.unitKey === "final"
+  const isFinal = state.unitKey === "final";
+  const p1Sub = isFinal
     ? "4 Random Exam Questions • Listening Reflex"
     : "8 Questions • Listening Mode & Sentence Audio";
 
-  app.innerHTML = `
-    <div class="screen-title">${unit.icon} ${unit.title}</div>
-    <div class="grid">
+  let modeCardsHtml = "";
+  if (state.level === "A2") {
+    const spotSub = isFinal
+      ? "6 Exam Picture Sets • Compare Pic A &amp; B + Follow-up"
+      : "Compare Picture A &amp; Picture B + Follow-up Question";
+    const feelSub = isFinal
+      ? "6 Exam Dialogue Sets • Problem, Sympathy &amp; Advice + Follow-up"
+      : "4-Step Dialogue (Ask Problem &amp; Give Advice) + Follow-up";
+
+    modeCardsHtml = `
+      <div class="big-card mode-card-p1" style="border-color: var(--primary);" onclick="navigate({screen: 'scene_p1', part: 1, hideP1Text: true})">
+        <span class="mode-task-badge mode-badge-p1">Part 1 • Personal Q&amp;A</span>
+        <div class="card-icon card-icon-svg icon-primary">${ICONS.mic}</div>
+        <div class="card-title">Part 1: Social Interaction</div>
+        <div class="card-sub">${p1Sub}</div>
+      </div>
+      <div class="big-card mode-card-spot" onclick="navigate({screen: 'role', part: 2, scenarioIdx: 0, variantIdx: 0})">
+        <span class="mode-task-badge mode-badge-spot">Part 2 • Exam Task 1</span>
+        <div class="card-icon card-icon-svg icon-ask">${ICONS.imageLg}</div>
+        <div class="card-title">Part 2A: Spot the Differences</div>
+        <div class="card-sub">${spotSub}</div>
+      </div>
+      <div class="big-card mode-card-feelings" onclick="navigate({screen: 'role', part: 2, scenarioIdx: 1, variantIdx: 0})">
+        <span class="mode-task-badge mode-badge-feelings">Part 2 • Exam Task 2</span>
+        <div class="card-icon card-icon-svg icon-feelings">${ICONS.heartChatLg}</div>
+        <div class="card-title">Part 2B: Feelings &amp; Advice ("What's the matter?")</div>
+        <div class="card-sub">${feelSub}</div>
+      </div>
+    `;
+  } else {
+    modeCardsHtml = `
       <div class="big-card" style="border-color: var(--primary);" onclick="navigate({screen: 'scene_p1', part: 1, hideP1Text: true})">
         <div class="card-icon card-icon-svg icon-primary">${ICONS.mic}</div>
         <div class="card-title">Part 1: Social Interaction</div>
@@ -689,6 +721,13 @@ function renderMode(app) {
         <div class="card-title">Part 2: Pair Role-play</div>
         <div class="card-sub">${unit.part2.taskName}</div>
       </div>
+    `;
+  }
+
+  app.innerHTML = `
+    <div class="screen-title">${unit.icon} ${unit.title}</div>
+    <div class="grid">
+      ${modeCardsHtml}
     </div>
     <div class="pedagogy-note">
       <div class="pedagogy-note-header">${ICONS.bulbSm} <span>Study Tip • Lưu ý khi ôn luyện</span></div>
@@ -702,19 +741,109 @@ function renderMode(app) {
   `;
 }
 
+// Prominent 50/50 Dual-Task Switcher for Level A2 Part 2 (Task 1: Spot Differences vs Task 2: Feelings & Advice)
+function renderA2TaskSwitcher() {
+  const isSpot = state.scenarioIdx === 0;
+  const isFeel = state.scenarioIdx === 1;
+  return `
+    <div class="a2-task-switcher" role="tablist" aria-label="Level A2 Part 2 Exam Tasks">
+      <button type="button" class="a2-task-tab tab-spot ${isSpot ? 'active active-spot' : ''}" onclick="switchA2Task(0, false)">
+        <span class="a2-tab-ico">${ICONS.image}</span>
+        <span class="a2-tab-text">
+          <span class="a2-tab-kicker">Part 2 • Task 1</span>
+          <span class="a2-tab-name">Spot Differences</span>
+        </span>
+      </button>
+      <button type="button" class="a2-task-tab tab-feelings ${isFeel ? 'active active-feelings' : ''}" onclick="switchA2Task(1, false)">
+        <span class="a2-tab-ico">${ICONS.heartChat}</span>
+        <span class="a2-tab-text">
+          <span class="a2-tab-kicker">Part 2 • Task 2</span>
+          <span class="a2-tab-name">Feelings &amp; Advice</span>
+        </span>
+      </button>
+    </div>
+  `;
+}
+
+// Bottom Call-to-Action Card in Level A2 Part 2 so students never forget to practice the other Part 2 format
+function renderA2NextTaskBanner() {
+  if (state.level !== "A2") return "";
+  if (state.scenarioIdx === 0) {
+    return `
+      <button type="button" class="next-task-banner to-feelings" onclick="switchA2Task(1, true)">
+        <div class="next-task-left">
+          <div class="next-task-icon">${ICONS.heartChat}</div>
+          <div class="next-task-copy">
+            <span class="next-task-kicker">Next Part 2 Task • Luyện tiếp dạng đề 2</span>
+            <span class="next-task-title">Task 2: Feelings &amp; Advice ("What's the matter?")</span>
+            <span class="next-task-sub">4-step problem &amp; advice role-play (Role ${state.role})</span>
+          </div>
+        </div>
+        <span class="next-task-arrow">${ICONS.arrowRight}</span>
+      </button>
+    `;
+  }
+  return `
+    <button type="button" class="next-task-banner to-spot" onclick="switchA2Task(0, true)">
+      <div class="next-task-left">
+        <div class="next-task-icon">${ICONS.image}</div>
+        <div class="next-task-copy">
+          <span class="next-task-kicker">Other Part 2 Task • Chuyển sang dạng đề 1</span>
+          <span class="next-task-title">Task 1: Spot the Differences</span>
+          <span class="next-task-sub">Compare Picture A &amp; Picture B (Role ${state.role})</span>
+        </div>
+      </div>
+      <span class="next-task-arrow">${ICONS.arrowRight}</span>
+    </button>
+  `;
+}
+
+function switchA2Task(targetIdx, shouldScrollTop) {
+  const data = getLevelData();
+  const unit = data && data[state.unitKey];
+  if (!unit || !unit.part2 || !unit.part2.scenarios[targetIdx]) return;
+  if (state.scenarioIdx === targetIdx && !shouldScrollTop) return;
+
+  const nextEntry = unit.part2.scenarios[targetIdx];
+  state.scenarioIdx = targetIdx;
+  if (nextEntry.variants && nextEntry.variants.length > 0) {
+    state.variantIdx = state.variantIdx % nextEntry.variants.length;
+  } else {
+    state.variantIdx = 0;
+  }
+  clearHints();
+  if (state.screen === "scene_p2") {
+    resetTimer();
+  }
+  render();
+  if (shouldScrollTop && typeof window.scrollTo === "function") {
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      window.scrollTo(0, 0);
+    }
+  }
+}
+
 function renderRoleSelect(app) {
   const data = getLevelData();
   const unit = data[state.unitKey];
   const scenarios = unit.part2.scenarios;
   const isFinal = state.unitKey === "final";
+  const isA2 = state.level === "A2";
 
-  let pillsHtml = `<div class="scenario-pills" style="justify-content:center; margin-bottom:10px;">`;
-  scenarios.forEach((sc, idx) => {
-    const active = idx === state.scenarioIdx ? "active" : "";
-    const text = sc.label || `Scenario ${idx + 1}`;
-    pillsHtml += `<div class="pill ${active}" onclick="selectScenario(${idx})">${text}</div>`;
-  });
-  pillsHtml += `</div>`;
+  let switcherHtml = "";
+  if (isA2) {
+    switcherHtml = renderA2TaskSwitcher();
+  } else {
+    switcherHtml = `<div class="scenario-pills" style="justify-content:center; margin-bottom:10px;">`;
+    scenarios.forEach((sc, idx) => {
+      const active = idx === state.scenarioIdx ? "active" : "";
+      const text = sc.label || `Scenario ${idx + 1}`;
+      switcherHtml += `<div class="pill ${active}" onclick="selectScenario(${idx})">${text}</div>`;
+    });
+    switcherHtml += `</div>`;
+  }
 
   let variantHtml = "";
   if (isFinal && scenarios[state.scenarioIdx].variants) {
@@ -727,9 +856,11 @@ function renderRoleSelect(app) {
     variantHtml += `</div>`;
   }
 
+  const titleText = isA2 ? "Choose Part 2 Task &amp; Role" : "Choose Scenario &amp; Role";
+
   app.innerHTML = `
-    <div class="screen-title">Choose Scenario & Role</div>
-    ${pillsHtml}
+    <div class="screen-title">${titleText}</div>
+    ${switcherHtml}
     ${variantHtml}
     <div class="grid grid-2">
       <div class="big-card role-btn-a" onclick="navigate({screen: 'scene_p2', role: 'A'})">
@@ -1112,6 +1243,7 @@ function renderSpotDiffBody(sd) {
     </div>
 
     ${renderFollowUpCard(followUpItem)}
+    ${renderA2NextTaskBanner()}
     ${zoomModalHtml}
   `;
 }
@@ -1123,17 +1255,7 @@ function renderPart2Scene(app) {
   const scenarios = unit.part2.scenarios;
   const currentSc = getActiveScenario();
   const isFinal = state.unitKey === "final";
-
-  let pillsHtml = `<div class="scenario-pills">`;
-  scenarios.forEach((sc, idx) => {
-    const active = idx === state.scenarioIdx ? "active" : "";
-    const text = sc.label || `#${idx + 1}`;
-    pillsHtml += `<div class="pill ${active}" onclick="changeSceneScenario(${idx})">${text}</div>`;
-  });
-  if (isFinal) {
-    pillsHtml += `<button class="pill pill-icon" onclick="randomFinalScenario()" title="Random Task & Set">${ICONS.shuffle}</button>`;
-  }
-  pillsHtml += `</div>`;
+  const isA2 = state.level === "A2";
 
   const badgeClass = state.role === "A" ? "badge-a" : "badge-b";
   const otherRole = state.role === "A" ? "B" : "A";
@@ -1144,16 +1266,45 @@ function renderPart2Scene(app) {
     variantBtnHtml = `<button class="variant-pill" onclick="cycleFinalVariant()" title="Switch Exam Set">Set #${state.variantIdx + 1}/${totalVars} ↻</button>`;
   }
 
-  const topControlsHtml = `
-    <div class="top-controls">
-      ${pillsHtml}
-      <div class="role-switch-group">
-        ${variantBtnHtml}
-        <span class="role-badge ${badgeClass}">Role ${state.role}</span>
-        <button class="switch-btn" onclick="switchRole()">Switch → ${otherRole}</button>
+  let topControlsHtml = "";
+  if (isA2) {
+    const leftMetaHtml = isFinal
+      ? `<div class="scenario-pills">${variantBtnHtml}<button class="pill pill-icon" onclick="randomFinalScenario()" title="Random Task & Set">${ICONS.shuffle}</button></div>`
+      : `<span class="a2-active-chip ${state.scenarioIdx === 1 ? 'chip-feelings' : 'chip-spot'}">${state.scenarioIdx === 1 ? "Task 2 • What's the matter?" : "Task 1 • Compare Pic A &amp; B"}</span>`;
+
+    topControlsHtml = `
+      ${renderA2TaskSwitcher()}
+      <div class="top-controls">
+        ${leftMetaHtml}
+        <div class="role-switch-group">
+          <span class="role-badge ${badgeClass}">Role ${state.role}</span>
+          <button class="switch-btn" onclick="switchRole()">Switch → ${otherRole}</button>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  } else {
+    let pillsHtml = `<div class="scenario-pills">`;
+    scenarios.forEach((sc, idx) => {
+      const active = idx === state.scenarioIdx ? "active" : "";
+      const text = sc.label || `#${idx + 1}`;
+      pillsHtml += `<div class="pill ${active}" onclick="changeSceneScenario(${idx})">${text}</div>`;
+    });
+    if (isFinal) {
+      pillsHtml += `<button class="pill pill-icon" onclick="randomFinalScenario()" title="Random Task & Set">${ICONS.shuffle}</button>`;
+    }
+    pillsHtml += `</div>`;
+
+    topControlsHtml = `
+      <div class="top-controls">
+        ${pillsHtml}
+        <div class="role-switch-group">
+          ${variantBtnHtml}
+          <span class="role-badge ${badgeClass}">Role ${state.role}</span>
+          <button class="switch-btn" onclick="switchRole()">Switch → ${otherRole}</button>
+        </div>
+      </div>
+    `;
+  }
 
   // Branch 1: Spot the Differences (Level A2 Task 1)
   if (currentSc.spotDiff) {
@@ -1296,11 +1447,13 @@ function renderPart2Scene(app) {
     : (giveOrMapHtml + askSectionHtml);
 
   const followUpHtml = renderFollowUpCard(roleData.followUp);
+  const nextTaskHtml = renderA2NextTaskBanner();
 
   app.innerHTML = `
     ${topControlsHtml}
     ${mainBodyHtml}
     ${followUpHtml}
+    ${nextTaskHtml}
   `;
 }
 
@@ -1388,10 +1541,10 @@ const TOUR_DEFS = {
   ],
   role: [
     {
-      selector: ".scenario-pills",
-      title: "Select Scenario • Chọn kịch bản đề",
-      en: "Pick a scenario set above before entering your role-play card.",
-      vi: "Chọn kịch bản đề ở thanh phía trên trước khi bắt đầu đóng vai."
+      selector: ".a2-task-switcher, .scenario-pills",
+      title: "Select Task / Scenario • Chọn dạng đề",
+      en: "Pick your Part 2 task or scenario set above before entering your role-play card.",
+      vi: "Chọn dạng đề hoặc kịch bản ở thanh phía trên trước khi bắt đầu đóng vai."
     },
     {
       selector: ".grid-2",
