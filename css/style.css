@@ -540,9 +540,203 @@ header {
   font-size: 0.78rem;
   font-weight: 600;
   color: #c7d2fe;
-  line-height: 1.35;
-  padding-bottom: 4px;
+  line-height: 1.38;
+  padding-bottom: 5px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.qa-sub-q > span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ==================== BILINGUAL STUDY TIP NOTE CARD (MODE SELECTION) ==================== */
+.pedagogy-note {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+  border: 1.5px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+  text-align: left;
+}
+
+.pedagogy-note-header {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #b45309;
+  letter-spacing: 0.1px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pedagogy-note-en {
+  font-size: 0.80rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.42;
+  margin-bottom: 6px;
+}
+
+.pedagogy-note-vi {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.44;
+  padding-top: 6px;
+  border-top: 1px dashed #fcd34d;
+}
+
+.pedagogy-note strong {
+  color: #92400e;
+  font-weight: 800;
+}
+
+/* ==================== PART 1 EXAM LISTENING MODE BAR & MASKED QUESTION CARDS ==================== */
+.listen-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--primary-border);
+  background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.listen-mode-bar.is-reading {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: #cbd5e1;
+}
+
+.listen-mode-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.listen-mode-title {
+  font-size: 0.80rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.25;
+}
+
+.listen-mode-bar.is-reading .listen-mode-title {
+  color: var(--text);
+}
+
+.listen-mode-sub {
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.listen-toggle-btn {
+  background: var(--card);
+  border: 1.5px solid var(--primary-border);
+  border-bottom-width: 2.5px;
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: transform 0.16s var(--spring), background-color 0.15s ease;
+}
+
+.listen-mode-bar.is-reading .listen-toggle-btn {
+  background: var(--primary);
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
+.listen-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.qa-card.masked-q {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-style: solid;
+  border-color: var(--primary-border);
+  border-left: 4px solid var(--primary);
+}
+
+.eye-btn {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform 0.15s var(--spring), background-color 0.15s ease;
+}
+
+.eye-btn.active {
+  background: var(--primary-bg);
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+.eye-btn:active {
+  transform: scale(0.94);
+}
+
+.listen-hero-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border: 1.5px solid #1e40af;
+  border-bottom-width: 3px;
+  border-radius: 11px;
+  padding: 11px 14px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 3px 10px rgba(29, 78, 216, 0.20);
+  transition: transform 0.16s var(--spring), box-shadow 0.16s var(--spring), filter 0.15s ease;
+}
+
+.listen-hero-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.listen-hero-btn.playing {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35), 0 4px 12px rgba(2, 132, 199, 0.30);
+}
+
+.listen-hero-icon {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .qa-main-text {
@@ -1063,7 +1257,78 @@ header {
   display: none;
 }
 
-/* ==================== LIGHTBULB 💡 HINT BUTTON ==================== */
+/* ==================== ACTION GROUPS, FULL-SENTENCE 🔊 SPEAKER & 💡 HINT BUTTONS ==================== */
+.card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.card-actions-col {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.spk-sent-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid #93c5fd;
+  background: #eff6ff;
+  font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.16s var(--spring), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.spk-sent-btn:active {
+  transform: scale(0.86);
+}
+
+.peeking .spk-sent-btn {
+  background: rgba(255, 255, 255, 0.20);
+  border-color: rgba(255, 255, 255, 0.78);
+  color: #ffffff;
+}
+
+.spk-sent-btn.playing,
+.mini-spk-btn.playing {
+  background: #38bdf8;
+  border-color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.90);
+}
+
+.mini-spk-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-top: -1px;
+  transition: transform 0.15s var(--spring), background-color 0.15s ease;
+}
+
+.mini-spk-btn:active {
+  transform: scale(0.86);
+}
+
 .hint-btn {
   width: 30px;
   height: 30px;
@@ -1104,6 +1369,26 @@ header {
 
 .map-hint-btn:active {
   transform: translateY(-50%) scale(0.86);
+}
+
+.map-spk-btn {
+  position: absolute;
+  top: 15px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  font-size: 0.72rem;
+  z-index: 3;
+}
+
+.bldg-known.peeking .map-hint-btn {
+  top: auto;
+  bottom: 15px;
+  transform: none;
+}
+
+.bldg-known.peeking .map-hint-btn:active {
+  transform: scale(0.86);
 }
 
 /* ==================== TAP-TO-SPEAK VOCABULARY WORDS ==================== */
@@ -1532,9 +1817,23 @@ header {
     font-size: 0.84rem;
     line-height: 1.38;
   }
-  .hint-btn {
+  .hint-btn,
+  .spk-sent-btn {
     width: 28px;
     height: 28px;
+  }
+  .eye-btn {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 0.70rem;
+  }
+  .listen-mode-bar {
+    padding: 8px 9px;
+    gap: 7px;
+  }
+  .listen-toggle-btn {
+    padding: 5px 9px;
+    font-size: 0.72rem;
   }
   .bldg-box {
     min-height: 88px;

@@ -78,6 +78,34 @@ function renderSpeakableText(text, forceMeta = false) {
 
 let cachedEnVoice = null;
 let sharedAudio = null;
+let activeSpkBtn = null;
+
+function clearActiveSpkBtn() {
+  if (activeSpkBtn) {
+    activeSpkBtn.classList.remove("playing");
+    activeSpkBtn = null;
+  }
+}
+
+function setActiveSpkBtn(btn) {
+  clearActiveSpkBtn();
+  if (btn && btn.classList) {
+    activeSpkBtn = btn;
+    activeSpkBtn.classList.add("playing");
+  }
+}
+
+function stopAllAudio() {
+  clearActiveSpkBtn();
+  if (sharedAudio) {
+    sharedAudio.onended = null;
+    sharedAudio.onerror = null;
+    try { sharedAudio.pause(); } catch (e) {}
+  }
+  if ("speechSynthesis" in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+    window.speechSynthesis.cancel();
+  }
+}
 
 function pickBestEnglishVoice() {
   if (!("speechSynthesis" in window)) return null;
@@ -108,11 +136,14 @@ if ("speechSynthesis" in window) {
   }
 }
 
-function speakViaWebSpeech(word) {
-  if (!("speechSynthesis" in window) || !word) return;
+function speakViaWebSpeech(text, btn) {
+  if (!("speechSynthesis" in window) || !text) {
+    clearActiveSpkBtn();
+    return;
+  }
   cachedEnVoice = cachedEnVoice || pickBestEnglishVoice();
   const runSpeak = () => {
-    const utter = new SpeechSynthesisUtterance(word);
+    const utter = new SpeechSynthesisUtterance(text);
     if (cachedEnVoice) {
       utter.voice = cachedEnVoice;
       utter.lang = (cachedEnVoice.lang || "en-US").replace("_", "-");
@@ -120,7 +151,10 @@ function speakViaWebSpeech(word) {
       // en-US is preinstalled on 99% of Android/iOS phones (unlike en-GB which falls back to vi-VN!)
       utter.lang = "en-US";
     }
-    utter.rate = 0.9;
+    utter.rate = 0.92;
+    utter.onend = () => clearActiveSpkBtn();
+    utter.onerror = () => clearActiveSpkBtn();
+    if (btn) setActiveSpkBtn(btn);
     window.speechSynthesis.speak(utter);
   };
 
@@ -132,19 +166,131 @@ function speakViaWebSpeech(word) {
   }
 }
 
+function cleanSentenceForSpeech(rawText) {
+  if (!rawText) return "";
+  let s = String(rawText)
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}✓✗🟢📍❓⬆️←→]/gu, "")
+    .replace(/\([^)]*=[^)]*\)/g, "")
+    .replace(/My first name is\.\.\./gi, "My first name is Trung.")
+    .replace(/My surname is\.\.\./gi, "My surname is Nguyen.")
+    .replace(/My mother's name is\.\.\./gi, "My mother's name is Lan.")
+    .replace(/My father's name is\.\.\./gi, "My father's name is Minh.")
+    .replace(/\[090\.\.\.\]/gi, "0 9 0, 1 2 3, 4 5 6")
+    .replace(/\[\.\.\.@gmail\.com\]/gi, "alex at gmail dot com")
+    .replace(/\[£\.\.\.\]/g, "£10.50")
+    .replace(/\[\$\.\.\.\]/g, "$10.50")
+    .replace(/\b([A-Z])(?:-([A-Z])){2,}\b/g, m => m.split("-").join(", "))
+    .replace(/\[([^\]]+)\]/g, (_, inner) => inner.replace(/\s*\/\s*/g, ", or "))
+    .replace(/\bHe\s*\/\s*She\b/g, "He or she")
+    .replace(/\bhis\s*\/\s*her\b/gi, "his or her")
+    .replace(/\bVND\b/g, "Vietnamese dong")
+    .replace(/\s*—\s*/g, ". ")
+    .replace(/([.?!])\s*\/\s*/g, "$1 Or: ")
+    .replace(/\s+\/\s+/g, ", or ")
+    .replace(/\bRest\.(?=\s|$)/gi, "Restaurant")
+    .replace(/\bSt\b/g, "Street")
+    .replace(/\bRd\b/g, "Road")
+    .replace(/\bAve\b/g, "Avenue")
+    .replace(/\.\.\./g, ".")
+    .replace(/\.\s*\./g, ".")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return s;
+}
+
+function splitSentenceChunks(text, maxLen = 175) {
+  if (text.length <= maxLen) return [text];
+  const sentences = text.split(/(?<=[.?!])\s+/);
+  const chunks = [];
+  let current = "";
+  for (const part of sentences) {
+    if (!part) continue;
+    if ((current ? current.length + 1 + part.length : part.length) <= maxLen) {
+      current = current ? `${current} ${part}` : part;
+    } else {
+      if (current) chunks.push(current);
+      if (part.length <= maxLen) {
+        current = part;
+      } else {
+        // Split very long single clause at commas or spaces
+        const words = part.split(/\s+/);
+        let sub = "";
+        for (const w of words) {
+          if ((sub ? sub.length + 1 + w.length : w.length) <= maxLen) {
+            sub = sub ? `${sub} ${w}` : w;
+          } else {
+            if (sub) chunks.push(sub);
+            sub = w;
+          }
+        }
+        current = sub;
+      }
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
+function speakSentence(event, rawText) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const btn = event ? event.currentTarget : null;
+  const cleaned = cleanSentenceForSpeech(rawText);
+  if (!cleaned) return;
+
+  stopAllAudio();
+
+  if (navigator.onLine !== false) {
+    try {
+      if (!sharedAudio) {
+        sharedAudio = new Audio();
+        sharedAudio.referrerPolicy = "no-referrer";
+      }
+      const chunks = splitSentenceChunks(cleaned, 175);
+      let idx = 0;
+
+      const playNextChunk = () => {
+        if (idx >= chunks.length) {
+          clearActiveSpkBtn();
+          return;
+        }
+        const chunk = chunks[idx++];
+        sharedAudio.onended = () => playNextChunk();
+        sharedAudio.onerror = () => {
+          sharedAudio.onended = null;
+          sharedAudio.onerror = null;
+          speakViaWebSpeech(cleaned, btn);
+        };
+        sharedAudio.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en-GB&q=${encodeURIComponent(chunk)}`;
+        const p = sharedAudio.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            sharedAudio.onended = null;
+            sharedAudio.onerror = null;
+            speakViaWebSpeech(cleaned, btn);
+          });
+        }
+      };
+
+      setActiveSpkBtn(btn);
+      playNextChunk();
+      return;
+    } catch (e) {
+      // Fall through to Web Speech API
+    }
+  }
+
+  speakViaWebSpeech(cleaned, btn);
+}
+
 function speakWord(event, word) {
   if (event) {
     event.stopPropagation();
   }
   if (!word) return;
 
-  // Stop any currently playing speech/audio
-  if (sharedAudio) {
-    try { sharedAudio.pause(); } catch (e) {}
-  }
-  if ("speechSynthesis" in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
-    window.speechSynthesis.cancel();
-  }
+  stopAllAudio();
 
   // Primary on mobile & web: Real British English dictionary audio (never reads in Vietnamese!)
   const isPureEnglishWord = /^[a-zA-Z][a-zA-Z']*$/.test(word);
@@ -152,7 +298,9 @@ function speakWord(event, word) {
     try {
       if (!sharedAudio) {
         sharedAudio = new Audio();
+        sharedAudio.referrerPolicy = "no-referrer";
       }
+      sharedAudio.onended = null;
       sharedAudio.onerror = () => {
         sharedAudio.onerror = null;
         speakViaWebSpeech(word);
@@ -174,15 +322,18 @@ function speakWord(event, word) {
   speakViaWebSpeech(word);
 }
 
-// ==================== LIGHTBULB 💡 HINT TOGGLE & INTERACTIVE IMAGE VIEWER STATE ====================
+// ==================== LIGHTBULB 💡 HINT TOGGLE, LISTENING MODE & IMAGE VIEWER STATE ====================
 let openHints = {};
+let revealedP1 = {};
 let zoomedImgSrc = null;
 let spotViewMode = "stack"; // "stack" (Pic A full-width above Pic B), "A", "B", or "side"
 let zoomScale = 1.6;
 let zoomTab = "A"; // Inside fullscreen modal: "A", "B", or "stack"
 
 function clearHints() {
+  stopAllAudio();
   openHints = {};
+  revealedP1 = {};
   zoomedImgSrc = null;
 }
 
@@ -190,7 +341,22 @@ function toggleHint(event, key) {
   if (event) {
     event.stopPropagation();
   }
+  stopAllAudio();
   openHints[key] = !openHints[key];
+  render();
+}
+
+function toggleP1ListeningMode(event) {
+  if (event) event.stopPropagation();
+  stopAllAudio();
+  state.hideP1Text = !state.hideP1Text;
+  revealedP1 = {};
+  render();
+}
+
+function toggleRevealP1Card(event, key) {
+  if (event) event.stopPropagation();
+  revealedP1[key] = !revealedP1[key];
   render();
 }
 
@@ -317,7 +483,8 @@ let state = {
   scenarioIdx: 0,
   variantIdx: 0,
   role: "A",
-  showAllFinalP1: false
+  showAllFinalP1: false,
+  hideP1Text: true
 };
 
 let historyStack = [];
@@ -339,7 +506,8 @@ function selectLevel(lvl) {
     scenarioIdx: 0,
     variantIdx: 0,
     role: "A",
-    showAllFinalP1: false
+    showAllFinalP1: false,
+    hideP1Text: true
   };
   render();
 }
@@ -469,13 +637,13 @@ function renderMode(app) {
   const data = getLevelData();
   const unit = data[state.unitKey];
   const p1Sub = state.unitKey === "final"
-    ? "4 Random Exam Questions (or View All 48)"
-    : "8 Questions (Tap any word to hear • 💡 for hint)";
+    ? "4 Random Exam Questions • 🎧 Listening Mode"
+    : "8 Questions • 🎧 Listening Mode & 🔊 Full-Sentence Audio";
 
   app.innerHTML = `
     <div class="screen-title">${unit.icon} ${unit.title}</div>
     <div class="grid">
-      <div class="big-card" style="border-color: var(--primary);" onclick="navigate({screen: 'scene_p1', part: 1})">
+      <div class="big-card" style="border-color: var(--primary);" onclick="navigate({screen: 'scene_p1', part: 1, hideP1Text: true})">
         <div class="card-icon">🎙️</div>
         <div class="card-title">Part 1: Social Interaction</div>
         <div class="card-sub">${p1Sub}</div>
@@ -485,6 +653,15 @@ function renderMode(app) {
         <div class="card-title">Part 2: Pair Role-play</div>
         <div class="card-sub">${unit.part2.taskName}</div>
       </div>
+    </div>
+    <div class="pedagogy-note">
+      <div class="pedagogy-note-header">💡 Study Tip • Lưu ý khi ôn luyện</div>
+      <p class="pedagogy-note-en">
+        All <strong>💡 Hints</strong> are <strong>sample suggestions only</strong>, not fixed exam answers. Use your own real ideas and personal details instead of memorizing mechanically!
+      </p>
+      <p class="pedagogy-note-vi">
+        Các câu trong mục <strong>💡 Gợi ý</strong> chỉ mang tính tham khảo về cấu trúc &amp; ý tưởng, <strong>không phải đáp án bắt buộc</strong>. Hãy linh hoạt thay đổi theo thông tin thật của bạn để nói tự nhiên, tránh học thuộc lòng rập khuôn nhé!
+      </p>
     </div>
   `;
 }
@@ -544,19 +721,30 @@ function selectVariant(vIdx) {
   render();
 }
 
-// Part 1: Tap any word to hear pronunciation; tap 💡 to toggle Answer Hint
+// Part 1: Exam Listening Mode (questions hidden by default) + Full-Sentence Audio 🔊 + Word Tap + 💡 Answer Hint
 function renderPart1Scene(app) {
   const data = getLevelData();
   const unit = data[state.unitKey];
   const isFinal = state.unitKey === "final";
   const activeList = (isFinal && state.showAllFinalP1) ? unit.allPart1 : unit.part1;
 
+  const modeTitle = state.hideP1Text
+    ? "🎧 Listening Mode (Questions Hidden)"
+    : "📖 Reading Mode (Questions Visible)";
+  const modeSub = state.hideP1Text
+    ? "Listen to 🔊 &amp; answer aloud • 👁️ Check text • 💡 Sample hint"
+    : "🔊 Full sentence • Tap any word to look up • 💡 Sample hint";
+
   let html = `
     <div class="screen-title">${unit.title} — Part 1</div>
-    <div class="usage-tip">
-      <span>🔊 Tap any word to hear</span>
-      <span>•</span>
-      <span>💡 Tap for answer hint</span>
+    <div class="listen-mode-bar ${state.hideP1Text ? 'is-listening' : 'is-reading'}">
+      <div class="listen-mode-info">
+        <span class="listen-mode-title">${modeTitle}</span>
+        <span class="listen-mode-sub">${modeSub}</span>
+      </div>
+      <button class="listen-toggle-btn" onclick="toggleP1ListeningMode(event)">
+        ${state.hideP1Text ? "👁️ Show All" : "🎧 Hide Text"}
+      </button>
     </div>
   `;
 
@@ -574,24 +762,59 @@ function renderPart1Scene(app) {
   activeList.forEach((item, i) => {
     const key = `p1-${i}`;
     const isPeeking = !!openHints[key];
+    const isHidden = state.hideP1Text && !revealedP1[key];
     const badgeLabel = isPeeking
       ? `Answer Hint • Q${i + 1}`
       : (item.unitTitle ? `Q${i + 1} • ${item.unitTitle}` : `Question ${i + 1}`);
-    const subQuestionHtml = isPeeking
-      ? `<div class="qa-sub-q">${renderSpeakableText(item.q)}</div>`
-      : "";
-    const mainText = isPeeking ? item.h : item.q;
 
-    html += `
-      <div class="qa-card ${isPeeking ? 'peeking' : ''}">
-        <div class="qa-top">
-          <span class="qa-num">${badgeLabel}</span>
-          <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Answer Hint">💡</button>
+    if (isPeeking) {
+      html += `
+        <div class="qa-card peeking">
+          <div class="qa-top">
+            <span class="qa-num">${badgeLabel}</span>
+            <div class="card-actions">
+              <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(item.h)}')" title="Listen to full sample answer">🔊</button>
+              <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Close Answer Hint">💡</button>
+            </div>
+          </div>
+          <div class="qa-sub-q">
+            <button class="mini-spk-btn" onclick="speakSentence(event, '${escAttr(item.q)}')" title="Replay question">🔊</button>
+            <span>${renderSpeakableText(item.q)}</span>
+          </div>
+          <div class="qa-main-text">${renderSpeakableText(item.h)}</div>
         </div>
-        ${subQuestionHtml}
-        <div class="qa-main-text">${renderSpeakableText(mainText)}</div>
-      </div>
-    `;
+      `;
+    } else if (isHidden) {
+      html += `
+        <div class="qa-card masked-q">
+          <div class="qa-top">
+            <span class="qa-num">${badgeLabel}</span>
+            <div class="card-actions">
+              <button class="eye-btn" onclick="toggleRevealP1Card(event, '${key}')" title="Show question text">👁️ Text</button>
+              <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Answer Hint">💡</button>
+            </div>
+          </div>
+          <button class="listen-hero-btn" onclick="speakSentence(event, '${escAttr(item.q)}')">
+            <span class="listen-hero-icon">🔊</span>
+            <span>Listen to Question ${i + 1}</span>
+          </button>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="qa-card">
+          <div class="qa-top">
+            <span class="qa-num">${badgeLabel}</span>
+            <div class="card-actions">
+              ${state.hideP1Text ? `<button class="eye-btn active" onclick="toggleRevealP1Card(event, '${key}')" title="Hide question text">🙈 Hide</button>` : ""}
+              <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(item.q)}')" title="Listen to full question">🔊</button>
+              <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Answer Hint">💡</button>
+            </div>
+          </div>
+          <div class="qa-main-text">${renderSpeakableText(item.q)}</div>
+        </div>
+      `;
+    }
   });
   app.innerHTML = html;
 }
@@ -619,14 +842,20 @@ function renderMapLot(lotItems, lotIdx) {
 
     if (isKnownByRole) {
       const isPeeking = !!openHints[key];
-      const displayContent = isPeeking
-        ? renderSpeakableText(cell.dir)
-        : renderSpeakableText(cell.name);
+      if (isPeeking) {
+        return `
+          <div class="bldg-box bldg-known peeking">
+            <span class="bldg-name">${renderSpeakableText(cell.dir)}</span>
+            <button class="spk-sent-btn map-spk-btn" onclick="speakSentence(event, '${escAttr(cell.dir)}')" title="Listen to full directions">🔊</button>
+            <button class="hint-btn map-hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Directions">💡</button>
+          </div>
+        `;
+      }
 
       return `
-        <div class="bldg-box bldg-known ${isPeeking ? 'peeking' : ''}">
+        <div class="bldg-box bldg-known">
           <span class="bldg-tag">🟢 YOU KNOW [${cell.num}]</span>
-          <span class="bldg-name">${displayContent}</span>
+          <span class="bldg-name">${renderSpeakableText(cell.name)}</span>
           <span class="bldg-sub">Tap 💡 for directions</span>
           <button class="hint-btn map-hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Directions">💡</button>
         </div>
@@ -663,7 +892,12 @@ function renderFollowUpCard(followUpItem) {
     ? `Follow-up Answer Hint (Student ${state.role})`
     : `💬 Follow-up Question for Student ${state.role}`;
   const subQuestionHtml = isPeeking
-    ? `<div class="qa-sub-q">${renderSpeakableText(followUpItem.q)}</div>`
+    ? `
+      <div class="qa-sub-q">
+        <button class="mini-spk-btn" onclick="speakSentence(event, '${escAttr(followUpItem.q)}')" title="Replay follow-up question">🔊</button>
+        <span>${renderSpeakableText(followUpItem.q)}</span>
+      </div>
+    `
     : "";
   const bodyText = isPeeking ? followUpItem.h : followUpItem.q;
 
@@ -671,7 +905,10 @@ function renderFollowUpCard(followUpItem) {
     <div class="qa-card followup-card ${isPeeking ? 'peeking' : ''}">
       <div class="qa-top">
         <span class="qa-num">${badgeText}</span>
-        <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Answer Hint">💡</button>
+        <div class="card-actions">
+          <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(bodyText)}')" title="Listen to full sentence">🔊</button>
+          <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Answer Hint">💡</button>
+        </div>
       </div>
       ${subQuestionHtml}
       <div class="qa-main-text">${renderSpeakableText(bodyText)}</div>
@@ -692,7 +929,10 @@ function renderSpotDiffBody(sd) {
             <span class="diff-peek-label">${d.label}</span>
             <span class="diff-sentence">${renderSpeakableText(d.sentence)}</span>
           </div>
-          <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Comparison Sentence">💡</button>
+          <div class="card-actions-col">
+            <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(d.sentence)}')" title="Listen to full sentence">🔊</button>
+            <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Comparison Sentence">💡</button>
+          </div>
         </div>
       `;
     }
@@ -819,7 +1059,7 @@ function renderSpotDiffBody(sd) {
     <div class="section-card ask-section">
       <div class="section-header header-ask">
         <span>8 DIFFERENCES (DESCRIBE AT LEAST 6)</span>
-        <span class="hint-legend">💡 Full sentence</span>
+        <span class="hint-legend">💡 Sentence + 🔊</span>
       </div>
       <div class="diff-list">
         ${diffCardsHtml}
@@ -892,7 +1132,10 @@ function renderPart2Scene(app) {
             <span class="ask-peek-label">${row.label}</span>
             <span class="ask-text">${renderSpeakableText(row.q)}</span>
           </div>
-          <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Full Sentence">💡</button>
+          <div class="card-actions-col">
+            <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(row.q)}')" title="Listen to full sentence">🔊</button>
+            <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Full Sentence">💡</button>
+          </div>
         </div>
       `;
     }
@@ -911,7 +1154,7 @@ function renderPart2Scene(app) {
     <div class="section-card ask-section">
       <div class="section-header header-ask">
         <span>${cleanAskTitle}</span>
-        <span class="hint-legend">💡 Hint</span>
+        <span class="hint-legend">💡 Hint + 🔊</span>
       </div>
       <div class="${isStepListAsk ? 'step-list' : 'compact-grid'}">
         ${askItems}
@@ -927,7 +1170,7 @@ function renderPart2Scene(app) {
     giveOrMapHtml = `
       <div class="crossroads-card">
         <div class="map-header">
-          <span>🗺️ Map (Tap 💡 on 🟢 for directions)</span>
+          <span>🗺️ Map (Tap 💡 on 🟢 for directions + 🔊)</span>
           <span>❓ = Unlabelled</span>
         </div>
         <div class="crossroads-grid">
@@ -968,6 +1211,14 @@ function renderPart2Scene(app) {
       const valHtml = isPeeking
         ? renderSpeakableText(item.a)
         : renderSpeakableText(item.val);
+      const actionsHtml = isPeeking
+        ? `
+          <div class="card-actions-col">
+            <button class="spk-sent-btn" onclick="speakSentence(event, '${escAttr(item.a)}')" title="Listen to full sentence">🔊</button>
+            <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Full Sentence">💡</button>
+          </div>
+        `
+        : `<button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Full Sentence">💡</button>`;
 
       return `
         <div class="you-box ${isPeeking ? 'peeking' : ''}">
@@ -975,7 +1226,7 @@ function renderPart2Scene(app) {
             <span class="you-label">${renderSpeakableText(item.label)}</span>
             <span class="you-val">${valHtml}</span>
           </div>
-          <button class="hint-btn" onclick="toggleHint(event, '${key}')" title="Toggle Full Sentence">💡</button>
+          ${actionsHtml}
         </div>
       `;
     }).join("");
@@ -985,7 +1236,7 @@ function renderPart2Scene(app) {
       <div class="section-card you-section">
         <div class="section-header header-give">
           <span>${cleanGiveTitle}</span>
-          <span class="hint-legend">💡 Hint</span>
+          <span class="hint-legend">💡 Hint + 🔊</span>
         </div>
         <div class="${isStepListGive ? 'step-list' : 'compact-grid'}">
           ${giveItems}
