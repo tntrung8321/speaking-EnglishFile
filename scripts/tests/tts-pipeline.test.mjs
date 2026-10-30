@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import vm from "node:vm";
 
 export function loadAppContext(manifest = {}) {
@@ -53,9 +55,9 @@ export function loadAppContext(manifest = {}) {
   return ctx;
 }
 
-test("gitignore protects .env secrets, scripts/node_modules, and /docs/", () => {
+test("gitignore protects .env secrets, scripts/node_modules, and /docs/ while allowing .env.example", () => {
   const gi = fs.readFileSync(".gitignore", "utf8");
-  for (const pat of [".env", ".env.*", "scripts/node_modules/", "/docs/"]) {
+  for (const pat of [".env", ".env.*", "!.env.example", "scripts/node_modules/", "/docs/"]) {
     assert.ok(gi.includes(pat), `Missing ${pat} in .gitignore`);
   }
 });
@@ -152,4 +154,94 @@ test("parseWavPcm16 skips extra RIFF LIST chunks and wavBufferToMp3 outputs comp
   const mp3 = wavBufferToMp3(wav, 48);
   assert.ok(mp3.length > 400 && mp3.length < wav.length / 2, `Unexpected MP3 size ${mp3.length}`);
   assert.equal(mp3[0], 0xff); // MPEG frame sync byte
+});
+
+
+test("runGenerator sends Gemini 3.8 TTS schema, retries HTTP 429, skips existing MP3s on resume, syncs manifest, and surgically updates + prunes 1 edited sentence", async () => {
+  const { runGenerator } = await import("../generate-tts.mjs");
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ef-tts-"));
+  const audioDir = path.join(tmpDir, "audio");
+  const manifestPath = path.join(tmpDir, "audio-manifest.js");
+
+  try {
+    // Minimal 0.1s valid 24kHz WAV payload in base64
+    const pcm = Buffer.alloc(4800);
+    const hdr = Buffer.alloc(44);
+    hdr.write("RIFF", 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write("WAVEfmt ", 8);
+    hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22);
+    hdr.writeUInt32LE(24000, 24); hdr.writeUInt32LE(48000, 28); hdr.writeUInt16LE(2, 32);
+    hdr.writeUInt16LE(16, 34); hdr.write("data", 36); hdr.writeUInt32LE(pcm.length, 40);
+    const b64Wav = Buffer.concat([hdr, pcm]).toString("base64");
+
+    const calls = [];
+    let throttleOnce = true;
+    const fakeFetch = async (url, init) => {
+      const body = JSON.parse(init.body);
+      calls.push({ url, headers: init.headers, body });
+      if (throttleOnce) {
+        throttleOnce = false;
+        return { ok: false, status: 429, headers: { get: () => "0" }, text: async () => "rate limited" };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          steps: [{ type: "model_output", content: [{ type: "audio", mime_type: "audio/wav", data: b64Wav }] }]
+        })
+      };
+    };
+
+    const items = [
+      { id: "11111111", cleaned: "I'm feeling really tired.", category: "p2_feelings_problem" },
+      { id: "22222222", cleaned: "What's your name?", category: "question" }
+    ];
+
+    // First run: 1st item hits 429 then succeeds; 2nd item succeeds -> 3 fetch calls total
+    const res1 = await runGenerator({
+      apiKey: "test-key", items, audioDir, manifestPath, voice: "Aoede",
+      model: "gemini-3.8-flash-tts", delayMs: 0, baseBackoffMs: 5, fetchImpl: fakeFetch, quiet: true
+    });
+    assert.equal(res1.generated, 2);
+    assert.equal(res1.skipped, 0);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[0].headers["x-goog-api-key"], "test-key");
+    assert.equal(calls[0].body.model, "gemini-3.8-flash-tts");
+    assert.equal(calls[0].body.store, false);
+    assert.equal(calls[0].body.response_format.type, "audio");
+    assert.equal(calls[0].body.generation_config.speech_config[0].voice, "Aoede");
+    assert.equal(calls[0].body.input[0].content[0].annotations[0].type, "speech_metadata");
+
+    // Second run (resume): both MP3s already exist -> 0 new fetch calls!
+    const res2 = await runGenerator({
+      apiKey: "test-key", items, audioDir, manifestPath, voice: "Aoede",
+      model: "gemini-3.8-flash-tts", delayMs: 0, baseBackoffMs: 5, fetchImpl: fakeFetch, quiet: true
+    });
+    assert.equal(res2.generated, 0);
+    assert.equal(res2.skipped, 2);
+    assert.equal(calls.length, 3);
+
+    const manifestJs = fs.readFileSync(manifestPath, "utf8");
+    assert.ok(manifestJs.includes('"11111111":1') && manifestJs.includes('"22222222":1'));
+
+    // Third run (1 sentence edited: "11111111" replaced by "33333333"): generates ONLY the 1 edited sentence and auto-prunes orphan "11111111.mp3"!
+    const editedItems = [
+      { id: "33333333", cleaned: "I'm feeling exhausted today.", category: "p2_feelings_problem" },
+      { id: "22222222", cleaned: "What's your name?", category: "question" }
+    ];
+    const res3 = await runGenerator({
+      apiKey: "test-key", items: editedItems, activeCorpusIds: new Set(["33333333", "22222222"]),
+      pruneOrphans: true, audioDir, manifestPath, voice: "Aoede",
+      model: "gemini-3.8-flash-tts", delayMs: 0, baseBackoffMs: 5, fetchImpl: fakeFetch, quiet: true
+    });
+    assert.equal(res3.generated, 1); // Only the 1 changed sentence!
+    assert.equal(res3.skipped, 1);   // Unchanged sentence untouched!
+    assert.equal(res3.pruned, 1);    // Old typo MP3 automatically deleted!
+    assert.equal(fs.existsSync(path.join(audioDir, "11111111.mp3")), false);
+    assert.equal(fs.existsSync(path.join(audioDir, "33333333.mp3")), true);
+    const manifestAfterEdit = fs.readFileSync(manifestPath, "utf8");
+    assert.ok(!manifestAfterEdit.includes('"11111111":1'));
+    assert.ok(manifestAfterEdit.includes('"33333333":1') && manifestAfterEdit.includes('"22222222":1'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

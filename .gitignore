@@ -36,5 +36,6 @@ desktop.ini
 # Secrets & local Node generator dependencies (NEVER upload API keys)
 .env
 .env.*
+!.env.example
 node_modules/
 scripts/node_modules/
