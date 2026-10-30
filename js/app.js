@@ -76,21 +76,110 @@ function renderSpeakableText(text, forceMeta = false) {
   }).join("");
 }
 
+let cachedEnVoice = null;
+let sharedAudio = null;
+
+function pickBestEnglishVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices() || [];
+  if (!voices.length) return null;
+  const enVoices = voices.filter(v => {
+    const lang = (v.lang || "").toLowerCase().replace("_", "-");
+    const name = (v.name || "").toLowerCase();
+    if (lang.startsWith("vi") || name.includes("viet")) return false;
+    return lang.startsWith("en") || name.includes("english");
+  });
+  if (!enVoices.length) return null;
+  return (
+    enVoices.find(v => /en[-_]gb/i.test(v.lang) && /google|siri|daniel|kate|serena|natural/i.test(v.name)) ||
+    enVoices.find(v => /en[-_]us/i.test(v.lang) && /google|siri|samantha|alex|natural/i.test(v.name)) ||
+    enVoices.find(v => /en[-_]gb/i.test(v.lang)) ||
+    enVoices.find(v => /en[-_]us/i.test(v.lang)) ||
+    enVoices[0]
+  );
+}
+
+if ("speechSynthesis" in window) {
+  cachedEnVoice = pickBestEnglishVoice();
+  if (typeof window.speechSynthesis.onvoiceschanged !== "undefined") {
+    window.speechSynthesis.onvoiceschanged = () => {
+      cachedEnVoice = pickBestEnglishVoice();
+    };
+  }
+}
+
+function speakViaWebSpeech(word) {
+  if (!("speechSynthesis" in window) || !word) return;
+  cachedEnVoice = cachedEnVoice || pickBestEnglishVoice();
+  const runSpeak = () => {
+    const utter = new SpeechSynthesisUtterance(word);
+    if (cachedEnVoice) {
+      utter.voice = cachedEnVoice;
+      utter.lang = (cachedEnVoice.lang || "en-US").replace("_", "-");
+    } else {
+      // en-US is preinstalled on 99% of Android/iOS phones (unlike en-GB which falls back to vi-VN!)
+      utter.lang = "en-US";
+    }
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
+  };
+
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+    window.speechSynthesis.cancel();
+    setTimeout(runSpeak, 25);
+  } else {
+    runSpeak();
+  }
+}
+
 function speakWord(event, word) {
   if (event) {
     event.stopPropagation();
   }
-  if (!("speechSynthesis" in window) || !word) return;
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(word);
-  utter.lang = "en-GB";
-  utter.rate = 0.9;
-  window.speechSynthesis.speak(utter);
+  if (!word) return;
+
+  // Stop any currently playing speech/audio
+  if (sharedAudio) {
+    try { sharedAudio.pause(); } catch (e) {}
+  }
+  if ("speechSynthesis" in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+    window.speechSynthesis.cancel();
+  }
+
+  // Primary on mobile & web: Real British English dictionary audio (never reads in Vietnamese!)
+  const isPureEnglishWord = /^[a-zA-Z][a-zA-Z']*$/.test(word);
+  if (isPureEnglishWord && navigator.onLine !== false) {
+    try {
+      if (!sharedAudio) {
+        sharedAudio = new Audio();
+      }
+      sharedAudio.onerror = () => {
+        sharedAudio.onerror = null;
+        speakViaWebSpeech(word);
+      };
+      sharedAudio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`;
+      const playPromise = sharedAudio.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          sharedAudio.onerror = null;
+          speakViaWebSpeech(word);
+        });
+      }
+      return;
+    } catch (e) {
+      // Fall through to Web Speech API
+    }
+  }
+
+  speakViaWebSpeech(word);
 }
 
-// ==================== LIGHTBULB 💡 HINT TOGGLE & IMAGE ZOOM STATE ====================
+// ==================== LIGHTBULB 💡 HINT TOGGLE & INTERACTIVE IMAGE VIEWER STATE ====================
 let openHints = {};
 let zoomedImgSrc = null;
+let spotViewMode = "stack"; // "stack" (Pic A full-width above Pic B), "A", "B", or "side"
+let zoomScale = 1.6;
+let zoomTab = "A"; // Inside fullscreen modal: "A", "B", or "stack"
 
 function clearHints() {
   openHints = {};
@@ -105,11 +194,35 @@ function toggleHint(event, key) {
   render();
 }
 
-function toggleImageZoom(event, src) {
-  if (event) {
-    event.stopPropagation();
-  }
-  zoomedImgSrc = zoomedImgSrc ? null : src;
+function setSpotViewMode(event, mode) {
+  if (event) event.stopPropagation();
+  spotViewMode = mode;
+  render();
+}
+
+function openImageZoom(event, src, initialTab) {
+  if (event) event.stopPropagation();
+  zoomedImgSrc = src;
+  zoomTab = initialTab || (spotViewMode === "B" ? "B" : "A");
+  zoomScale = 1.6;
+  render();
+}
+
+function closeImageZoom(event) {
+  if (event) event.stopPropagation();
+  zoomedImgSrc = null;
+  render();
+}
+
+function setZoomTab(event, tab) {
+  if (event) event.stopPropagation();
+  zoomTab = tab;
+  render();
+}
+
+function setZoomScale(event, scale) {
+  if (event) event.stopPropagation();
+  zoomScale = scale;
   render();
 }
 
@@ -599,26 +712,107 @@ function renderSpotDiffBody(sd) {
   }).join("");
 
   const followUpItem = sd.followUp ? sd.followUp[state.role] : null;
-  const zoomModalHtml = zoomedImgSrc
-    ? `
-      <div class="img-zoom-backdrop" onclick="toggleImageZoom(event, null)">
-        <div class="img-zoom-container">
-          <img src="${zoomedImgSrc}" alt="${sd.title}" class="spot-img-zoomed">
-          <div class="img-zoom-hint">Tap anywhere to close ✕</div>
+
+  // Build Main Photo Display (Default: Picture A full-width stacked above Picture B full-width -> 2x larger on phones!)
+  let photoBodyHtml = "";
+  if (spotViewMode === "stack") {
+    photoBodyHtml = `
+      <div class="spot-stack">
+        <div class="half-crop" onclick="openImageZoom(event, '${sd.img}', 'A')" title="Tap to zoom Picture A">
+          <img src="${sd.img}" alt="Picture A" class="half-img half-img-a">
+        </div>
+        <div class="half-crop" onclick="openImageZoom(event, '${sd.img}', 'B')" title="Tap to zoom Picture B">
+          <img src="${sd.img}" alt="Picture B" class="half-img half-img-b">
         </div>
       </div>
-    `
-    : "";
+    `;
+  } else if (spotViewMode === "A") {
+    photoBodyHtml = `
+      <div class="half-crop" onclick="openImageZoom(event, '${sd.img}', 'A')" title="Tap to zoom Picture A">
+        <img src="${sd.img}" alt="Picture A" class="half-img half-img-a">
+      </div>
+    `;
+  } else if (spotViewMode === "B") {
+    photoBodyHtml = `
+      <div class="half-crop" onclick="openImageZoom(event, '${sd.img}', 'B')" title="Tap to zoom Picture B">
+        <img src="${sd.img}" alt="Picture B" class="half-img half-img-b">
+      </div>
+    `;
+  } else {
+    photoBodyHtml = `
+      <div class="spot-img-wrap" onclick="openImageZoom(event, '${sd.img}', 'stack')">
+        <img src="${sd.img}" alt="${sd.title}" class="spot-img">
+      </div>
+    `;
+  }
+
+  let zoomModalHtml = "";
+  if (zoomedImgSrc) {
+    const scalePct = Math.round(zoomScale * 100);
+    let zoomedInnerHtml = "";
+    if (zoomTab === "A") {
+      zoomedInnerHtml = `
+        <div class="half-crop zoom-crop">
+          <img src="${zoomedImgSrc}" alt="Picture A" class="half-img half-img-a">
+        </div>
+      `;
+    } else if (zoomTab === "B") {
+      zoomedInnerHtml = `
+        <div class="half-crop zoom-crop">
+          <img src="${zoomedImgSrc}" alt="Picture B" class="half-img half-img-b">
+        </div>
+      `;
+    } else {
+      zoomedInnerHtml = `
+        <div class="spot-stack">
+          <div class="half-crop zoom-crop">
+            <img src="${zoomedImgSrc}" alt="Picture A" class="half-img half-img-a">
+          </div>
+          <div class="half-crop zoom-crop">
+            <img src="${zoomedImgSrc}" alt="Picture B" class="half-img half-img-b">
+          </div>
+        </div>
+      `;
+    }
+
+    zoomModalHtml = `
+      <div class="img-zoom-backdrop">
+        <div class="img-zoom-topbar">
+          <div class="zoom-tabs">
+            <button class="z-btn ${zoomTab === 'A' ? 'active' : ''}" onclick="setZoomTab(event, 'A')">Pic A</button>
+            <button class="z-btn ${zoomTab === 'B' ? 'active' : ''}" onclick="setZoomTab(event, 'B')">Pic B</button>
+            <button class="z-btn ${zoomTab === 'stack' ? 'active' : ''}" onclick="setZoomTab(event, 'stack')">A & B</button>
+          </div>
+          <div class="zoom-scales">
+            <button class="z-btn ${zoomScale === 1 ? 'active' : ''}" onclick="setZoomScale(event, 1)">1x</button>
+            <button class="z-btn ${zoomScale === 1.6 ? 'active' : ''}" onclick="setZoomScale(event, 1.6)">1.6x</button>
+            <button class="z-btn ${zoomScale === 2.4 ? 'active' : ''}" onclick="setZoomScale(event, 2.4)">2.4x</button>
+          </div>
+          <button class="z-close-btn" onclick="closeImageZoom(event)" title="Close">✕</button>
+        </div>
+        <div class="img-zoom-scroll">
+          <div class="img-zoom-canvas" style="width: ${scalePct}%;">
+            ${zoomedInnerHtml}
+          </div>
+        </div>
+        <div class="img-zoom-footer">Vuốt để kéo xem chi tiết • Bấm Pic A / Pic B để so sánh nhanh</div>
+      </div>
+    `;
+  }
 
   return `
     <div class="spot-photo-card">
       <div class="spot-photo-header">
         <span>🖼️ ${sd.title}</span>
-        <span class="zoom-badge" onclick="toggleImageZoom(event, '${sd.img}')">🔍 Tap to zoom</span>
+        <button class="zoom-badge" onclick="openImageZoom(event, '${sd.img}', '${spotViewMode === 'B' ? 'B' : 'A'}')">🔍 Phóng to</button>
       </div>
-      <div class="spot-img-wrap" onclick="toggleImageZoom(event, '${sd.img}')">
-        <img src="${sd.img}" alt="${sd.title}" class="spot-img" loading="lazy">
+      <div class="spot-view-bar">
+        <button class="view-mode-btn ${spotViewMode === 'stack' ? 'active' : ''}" onclick="setSpotViewMode(event, 'stack')">↕ A & B (To)</button>
+        <button class="view-mode-btn ${spotViewMode === 'A' ? 'active' : ''}" onclick="setSpotViewMode(event, 'A')">Pic A</button>
+        <button class="view-mode-btn ${spotViewMode === 'B' ? 'active' : ''}" onclick="setSpotViewMode(event, 'B')">Pic B</button>
+        <button class="view-mode-btn ${spotViewMode === 'side' ? 'active' : ''}" onclick="setSpotViewMode(event, 'side')">A | B</button>
       </div>
+      ${photoBodyHtml}
       <div class="spot-instruct">${sd.instruction}</div>
     </div>
 
